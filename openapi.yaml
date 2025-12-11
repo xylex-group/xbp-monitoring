@@ -1,0 +1,345 @@
+openapi: 3.0.3
+info:
+  title: XBP Monitoring API
+  version: "1.0.0"
+  description: Synthetic monitoring control and results API.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: http://{host}:{port}
+    description: Application server
+    variables:
+      host:
+        default: api
+      port:
+        default: "3000"
+  - url: http://{host}:{port}
+    description: Prometheus metrics server (when enabled)
+    variables:
+      host:
+        default: metrics
+      port:
+        default: "9464"
+security: []
+paths:
+  /:
+    get:
+      summary: Root heartbeat
+      operationId: getRoot
+      responses:
+        "200":
+          description: Server is running
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: Roar!
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /probes:
+    get:
+      summary: List configured probes and last status
+      operationId: listProbes
+      responses:
+        "200":
+          description: Probe summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProbeSummary"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /probes/{name}/results:
+    get:
+      summary: Get probe run history
+      operationId: getProbeResults
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: show_response
+          in: query
+          required: false
+          description: Include recorded HTTP response bodies
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Probe results (most recent first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProbeResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Probe not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /probes/{name}/trigger:
+    get:
+      summary: Run a probe immediately
+      operationId: triggerProbe
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Latest probe result after trigger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProbeResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Probe not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stories:
+    get:
+      summary: List configured stories and last status
+      operationId: listStories
+      responses:
+        "200":
+          description: Story summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProbeSummary"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stories/{name}/results:
+    get:
+      summary: Get story run history
+      operationId: getStoryResults
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: show_response
+          in: query
+          required: false
+          description: Include recorded HTTP response bodies
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: Story results (most recent first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoryResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /stories/{name}/trigger:
+    get:
+      summary: Run a story immediately
+      operationId: triggerStory
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Latest story result after trigger
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoryResult"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Story not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /metrics:
+    get:
+      summary: Prometheus scrape endpoint
+      description: Available when `OTEL_METRICS_EXPORTER=prometheus` is set.
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Prometheus metrics in text format
+          content:
+            text/plain:
+              schema:
+                type: string
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+components:
+  schemas:
+    ProbeSummary:
+      type: object
+      required:
+        - name
+        - status
+        - last_probed
+      properties:
+        name:
+          type: string
+          description: Probe or story name
+        status:
+          type: string
+          description: Last observed status
+          enum:
+            - OK
+            - FAILING
+        last_probed:
+          type: string
+          format: date-time
+          description: Timestamp of the last run
+    ProbeResult:
+      type: object
+      required:
+        - probe_name
+        - timestamp_started
+        - success
+      properties:
+        probe_name:
+          type: string
+        timestamp_started:
+          type: string
+          format: date-time
+        success:
+          type: boolean
+        error_message:
+          type: string
+          nullable: true
+        response:
+          $ref: "#/components/schemas/ProbeHttpResponse"
+        trace_id:
+          type: string
+          nullable: true
+    ProbeHttpResponse:
+      type: object
+      required:
+        - timestamp_received
+        - status_code
+        - body
+        - sensitive
+      properties:
+        timestamp_received:
+          type: string
+          format: date-time
+        status_code:
+          type: integer
+          format: int32
+        body:
+          type: string
+        sensitive:
+          type: boolean
+    StoryResult:
+      type: object
+      required:
+        - story_name
+        - timestamp_started
+        - success
+        - step_results
+      properties:
+        story_name:
+          type: string
+        timestamp_started:
+          type: string
+          format: date-time
+        success:
+          type: boolean
+        step_results:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepResult"
+    StepResult:
+      type: object
+      required:
+        - step_name
+        - timestamp_started
+        - success
+      properties:
+        step_name:
+          type: string
+        timestamp_started:
+          type: string
+          format: date-time
+        success:
+          type: boolean
+        error_message:
+          type: string
+          nullable: true
+        response:
+          $ref: "#/components/schemas/ProbeHttpResponse"
+        trace_id:
+          type: string
+          nullable: true
+        span_id:
+          type: string
+          nullable: true
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
