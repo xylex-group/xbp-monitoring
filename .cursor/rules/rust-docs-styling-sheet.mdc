@@ -1,0 +1,30 @@
+---
+alwaysApply: false
+---
+Title: Documentation Guidelines for xbp-monitoring
+
+- Language: Rust; use `///` for public items, `//` sparingly for internal-only notes.
+- Scope: Every function/method independently documented; keep comments adjacent to the item.
+- Tone: Concise, precise, implementation-aware; no filler, no emojis.
+- Content per item:
+  - Purpose: one-line summary of behavior/intent.
+  - Inputs/Outputs: list params, expected units/types, return meaning, notable side effects.
+  - Errors: enumerate primary failure cases and conditions.
+  - Concurrency: mention locking, async behavior, shared state expectations.
+  - Metrics/Tracing: describe emitted spans/metrics names, labels, and when they fire.
+  - Config/Env: reference relevant config keys/env vars affecting behavior.
+  - Invariants: pre/post-conditions and assumptions the caller must respect.
+  - Examples: include minimal Rust example when helpful; prefer compile-ready snippets.
+- Style:
+  - Keep each bullet short; avoid repetition.
+  - Prefer active voice; present tense.
+  - No shadow usage; follow project classes (text-primary, text-secondary, bg-background, bg-foreground, bg-hover, text-brand, bg-brand, rounded-sm/md, shadow-none).
+  - Use lucide-react icons whenever documenting UI components.
+  - Generic/reusable wording; avoid app-specific jargon unless defined.
+- Structure:
+  - Public APIs: full doc comments with examples and failure modes.
+  - Internal helpers: brief `///` if reused; otherwise `//` note for non-obvious logic.
+  - Modules: top-of-file `//!` describing module responsibilities and key types.
+- Prohibited:
+  - Shadows in styles; long prose; redundant comments.
+- Output: Commit documentation inline with code; do not create separate docs unless requested.
