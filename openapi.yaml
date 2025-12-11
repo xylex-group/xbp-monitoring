@@ -2,7 +2,20 @@ openapi: 3.0.3
 info:
   title: XBP Monitoring API
   version: "1.0.0"
-  description: Synthetic monitoring control and results API.
+  description: |
+    XBP Monitoring is a synthetic monitoring service that continuously probes HTTP endpoints and executes multi-step stories.
+    
+    ## Features
+    - **Probes**: Single HTTP endpoint checks with configurable expectations
+    - **Stories**: Multi-step workflows that can pass data between steps
+    - **Results**: Historical data of all probe and story executions
+    - **Metrics**: Prometheus-compatible metrics endpoint for observability
+    
+    ## Authentication
+    This API does not require authentication. All endpoints are publicly accessible.
+    
+    ## Rate Limiting
+    No rate limiting is currently enforced. Trigger endpoints execute probes/stories synchronously.
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
@@ -22,219 +35,576 @@ servers:
       port:
         default: "9464"
 security: []
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Probes
+    description: Probe management and results
+  - name: Stories
+    description: Story management and results
+  - name: Metrics
+    description: Observability endpoints
 paths:
   /:
     get:
+      tags:
+        - Health
       summary: Root heartbeat
+      description: Simple health check endpoint that returns a plain text response indicating the server is running.
       operationId: getRoot
       responses:
         "200":
-          description: Server is running
+          description: Server is running and ready to accept requests
           content:
             text/plain:
               schema:
                 type: string
                 example: Roar!
+              examples:
+                success:
+                  summary: Successful response
+                  value: Roar!
         "400":
-          description: Bad request
+          description: Bad request - invalid request format
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Bad request example
+                  value:
+                    error: "Invalid request format"
   /probes:
     get:
+      tags:
+        - Probes
       summary: List configured probes and last status
+      description: |
+        Returns a list of all configured probes with their current status and last execution time.
+        
+        Each probe summary includes:
+        - Probe name
+        - Current status (OK or FAILING)
+        - Timestamp of the last execution
+        
+        This endpoint is useful for dashboards and monitoring systems to quickly check the health of all probes.
       operationId: listProbes
       responses:
         "200":
-          description: Probe summaries
+          description: List of probe summaries with their current status
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProbeSummary"
+              examples:
+                success:
+                  summary: List of probes
+                  value:
+                    - name: "api-health-check"
+                      status: "OK"
+                      last_probed: "2024-01-15T10:30:00Z"
+                    - name: "database-check"
+                      status: "FAILING"
+                      last_probed: "2024-01-15T10:29:45Z"
         "400":
-          description: Bad request
+          description: Bad request - invalid request parameters
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Bad request example
+                  value:
+                    error: "Invalid request parameters"
   /probes/{name}/results:
     get:
+      tags:
+        - Probes
       summary: Get probe run history
+      description: |
+        Retrieves the complete execution history for a specific probe, ordered by most recent first.
+        
+        Each result includes:
+        - Execution timestamp
+        - Success/failure status
+        - Error message (if failed)
+        - HTTP response details (if `show_response=true`)
+        - OpenTelemetry trace ID (if available)
+        
+        Use the `show_response` parameter to include or exclude HTTP response bodies. By default, response bodies are excluded to reduce payload size.
       operationId: getProbeResults
       parameters:
         - name: name
           in: path
           required: true
+          description: The name of the probe as configured in the monitoring configuration file
           schema:
             type: string
+          example: "api-health-check"
         - name: show_response
           in: query
           required: false
-          description: Include recorded HTTP response bodies
+          description: |
+            When `true`, includes the full HTTP response body in each result.
+            When `false` (default), response bodies are excluded to reduce payload size.
+            Set to `true` when debugging specific failures.
           schema:
             type: boolean
             default: false
+          example: false
       responses:
         "200":
-          description: Probe results (most recent first)
+          description: Array of probe execution results, ordered from most recent to oldest
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProbeResult"
+              examples:
+                success:
+                  summary: Successful probe results
+                  value:
+                    - probe_name: "api-health-check"
+                      timestamp_started: "2024-01-15T10:30:00Z"
+                      success: true
+                      response:
+                        timestamp_received: "2024-01-15T10:30:00.123Z"
+                        status_code: 200
+                        body: '{"status":"ok"}'
+                        sensitive: false
+                      trace_id: "abc123def456"
+                failure:
+                  summary: Failed probe result
+                  value:
+                    - probe_name: "api-health-check"
+                      timestamp_started: "2024-01-15T10:29:00Z"
+                      success: false
+                      error_message: "Connection timeout after 10s"
+                      trace_id: "xyz789uvw012"
         "400":
-          description: Bad request
+          description: Bad request - invalid probe name format or query parameters
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Invalid parameters
+                  value:
+                    error: "Invalid probe name format"
         "404":
-          description: Probe not found
+          description: Probe not found - the specified probe name does not exist in the configuration
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                notFound:
+                  summary: Probe not found
+                  value:
+                    error: "Probe 'nonexistent-probe' not found"
   /probes/{name}/trigger:
     get:
+      tags:
+        - Probes
       summary: Run a probe immediately
+      description: |
+        Triggers an immediate execution of the specified probe, bypassing the scheduled interval.
+        
+        This endpoint:
+        1. Executes the probe immediately
+        2. Stores the result in the probe history
+        3. Returns the latest result
+        
+        Useful for:
+        - Manual testing of probe configurations
+        - On-demand health checks
+        - Debugging probe failures
+        
+        **Note**: This operation is synchronous and will wait for the probe to complete before returning.
       operationId: triggerProbe
       parameters:
         - name: name
           in: path
           required: true
+          description: The name of the probe to trigger, as configured in the monitoring configuration file
           schema:
             type: string
+          example: "api-health-check"
       responses:
         "200":
-          description: Latest probe result after trigger
+          description: The probe execution result immediately after triggering
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProbeResult"
+              examples:
+                success:
+                  summary: Successful probe execution
+                  value:
+                    probe_name: "api-health-check"
+                    timestamp_started: "2024-01-15T10:30:00Z"
+                    success: true
+                    response:
+                      timestamp_received: "2024-01-15T10:30:00.123Z"
+                      status_code: 200
+                      body: '{"status":"ok"}'
+                      sensitive: false
+                    trace_id: "abc123def456"
+                failure:
+                  summary: Failed probe execution
+                  value:
+                    probe_name: "api-health-check"
+                    timestamp_started: "2024-01-15T10:30:00Z"
+                    success: false
+                    error_message: "Expected status code 200, got 503"
+                    trace_id: "xyz789uvw012"
         "400":
-          description: Bad request
+          description: Bad request - invalid probe name format
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Invalid probe name
+                  value:
+                    error: "Invalid probe name format"
         "404":
-          description: Probe not found
+          description: Probe not found - the specified probe name does not exist in the configuration
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                notFound:
+                  summary: Probe not found
+                  value:
+                    error: "Probe 'nonexistent-probe' not found"
   /stories:
     get:
+      tags:
+        - Stories
       summary: List configured stories and last status
+      description: |
+        Returns a list of all configured stories (multi-step workflows) with their current status and last execution time.
+        
+        Each story summary includes:
+        - Story name
+        - Current status (OK or FAILING)
+        - Timestamp of the last execution
+        
+        A story is marked as FAILING if any step in the workflow fails. This endpoint is useful for monitoring the overall health of complex workflows.
       operationId: listStories
       responses:
         "200":
-          description: Story summaries
+          description: List of story summaries with their current status
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/ProbeSummary"
+              examples:
+                success:
+                  summary: List of stories
+                  value:
+                    - name: "user-registration-flow"
+                      status: "OK"
+                      last_probed: "2024-01-15T10:30:00Z"
+                    - name: "checkout-process"
+                      status: "FAILING"
+                      last_probed: "2024-01-15T10:29:30Z"
         "400":
-          description: Bad request
+          description: Bad request - invalid request parameters
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Bad request example
+                  value:
+                    error: "Invalid request parameters"
   /stories/{name}/results:
     get:
+      tags:
+        - Stories
       summary: Get story run history
+      description: |
+        Retrieves the complete execution history for a specific story, ordered by most recent first.
+        
+        Each result includes:
+        - Story name and execution timestamp
+        - Overall success/failure status
+        - Detailed results for each step in the story
+        - HTTP response details for each step (if `show_response=true`)
+        - OpenTelemetry trace and span IDs (if available)
+        
+        Stories are multi-step workflows where:
+        - Steps execute sequentially
+        - Data can be passed between steps using variable substitution
+        - The story fails if any step fails
+        
+        Use the `show_response` parameter to include or exclude HTTP response bodies. By default, response bodies are excluded to reduce payload size.
       operationId: getStoryResults
       parameters:
         - name: name
           in: path
           required: true
+          description: The name of the story as configured in the monitoring configuration file
           schema:
             type: string
+          example: "user-registration-flow"
         - name: show_response
           in: query
           required: false
-          description: Include recorded HTTP response bodies
+          description: |
+            When `true`, includes the full HTTP response body for each step in the story results.
+            When `false` (default), response bodies are excluded to reduce payload size.
+            Set to `true` when debugging specific step failures.
           schema:
             type: boolean
             default: false
+          example: false
       responses:
         "200":
-          description: Story results (most recent first)
+          description: Array of story execution results, ordered from most recent to oldest
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: "#/components/schemas/StoryResult"
+              examples:
+                success:
+                  summary: Successful story execution
+                  value:
+                    - story_name: "user-registration-flow"
+                      timestamp_started: "2024-01-15T10:30:00Z"
+                      success: true
+                      step_results:
+                        - step_name: "create-user"
+                          timestamp_started: "2024-01-15T10:30:00Z"
+                          success: true
+                          response:
+                            timestamp_received: "2024-01-15T10:30:00.123Z"
+                            status_code: 201
+                            body: '{"id":"123","email":"user@example.com"}'
+                            sensitive: false
+                          trace_id: "abc123def456"
+                          span_id: "span001"
+                        - step_name: "verify-email"
+                          timestamp_started: "2024-01-15T10:30:00.5Z"
+                          success: true
+                          response:
+                            timestamp_received: "2024-01-15T10:30:00.623Z"
+                            status_code: 200
+                            body: '{"verified":true}'
+                            sensitive: false
+                          trace_id: "abc123def456"
+                          span_id: "span002"
+                failure:
+                  summary: Failed story execution
+                  value:
+                    - story_name: "user-registration-flow"
+                      timestamp_started: "2024-01-15T10:29:00Z"
+                      success: false
+                      step_results:
+                        - step_name: "create-user"
+                          timestamp_started: "2024-01-15T10:29:00Z"
+                          success: true
+                          trace_id: "xyz789uvw012"
+                          span_id: "span001"
+                        - step_name: "verify-email"
+                          timestamp_started: "2024-01-15T10:29:00.5Z"
+                          success: false
+                          error_message: "Expected status code 200, got 500"
+                          trace_id: "xyz789uvw012"
+                          span_id: "span002"
         "400":
-          description: Bad request
+          description: Bad request - invalid story name format or query parameters
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Invalid parameters
+                  value:
+                    error: "Invalid story name format"
         "404":
-          description: Story not found
+          description: Story not found - the specified story name does not exist in the configuration
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                notFound:
+                  summary: Story not found
+                  value:
+                    error: "Story 'nonexistent-story' not found"
   /stories/{name}/trigger:
     get:
+      tags:
+        - Stories
       summary: Run a story immediately
+      description: |
+        Triggers an immediate execution of the specified story, bypassing the scheduled interval.
+        
+        This endpoint:
+        1. Executes all steps in the story sequentially
+        2. Stores the result in the story history
+        3. Returns the latest result with detailed step-by-step information
+        
+        Useful for:
+        - Manual testing of story workflows
+        - On-demand execution of complex multi-step processes
+        - Debugging story failures
+        
+        **Note**: This operation is synchronous and will wait for all steps in the story to complete before returning. The execution time depends on the number of steps and their individual timeouts.
       operationId: triggerStory
       parameters:
         - name: name
           in: path
           required: true
+          description: The name of the story to trigger, as configured in the monitoring configuration file
           schema:
             type: string
+          example: "user-registration-flow"
       responses:
         "200":
-          description: Latest story result after trigger
+          description: The story execution result immediately after triggering, including all step results
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/StoryResult"
+              examples:
+                success:
+                  summary: Successful story execution
+                  value:
+                    story_name: "user-registration-flow"
+                    timestamp_started: "2024-01-15T10:30:00Z"
+                    success: true
+                    step_results:
+                      - step_name: "create-user"
+                        timestamp_started: "2024-01-15T10:30:00Z"
+                        success: true
+                        response:
+                          timestamp_received: "2024-01-15T10:30:00.123Z"
+                          status_code: 201
+                          body: '{"id":"123"}'
+                          sensitive: false
+                        trace_id: "abc123def456"
+                        span_id: "span001"
+                failure:
+                  summary: Failed story execution
+                  value:
+                    story_name: "user-registration-flow"
+                    timestamp_started: "2024-01-15T10:30:00Z"
+                    success: false
+                    step_results:
+                      - step_name: "create-user"
+                        timestamp_started: "2024-01-15T10:30:00Z"
+                        success: false
+                        error_message: "Connection timeout"
+                        trace_id: "xyz789uvw012"
+                        span_id: "span001"
         "400":
-          description: Bad request
+          description: Bad request - invalid story name format
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Invalid story name
+                  value:
+                    error: "Invalid story name format"
         "404":
-          description: Story not found
+          description: Story not found - the specified story name does not exist in the configuration
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                notFound:
+                  summary: Story not found
+                  value:
+                    error: "Story 'nonexistent-story' not found"
   /metrics:
     get:
+      tags:
+        - Metrics
       summary: Prometheus scrape endpoint
-      description: Available when `OTEL_METRICS_EXPORTER=prometheus` is set.
+      description: |
+        Returns Prometheus-formatted metrics for scraping by Prometheus or compatible monitoring systems.
+        
+        **Availability**: This endpoint is only available when `OTEL_METRICS_EXPORTER=prometheus` environment variable is set.
+        
+        The metrics include:
+        - Probe/story execution counts (counter)
+        - Execution durations (histogram, in milliseconds)
+        - Error counts (counter)
+        - Status gauges (0=OK, 1=Error)
+        - HTTP status codes (gauge)
+        
+        Metrics are labeled with:
+        - `name`: Probe or story name
+        - `type`: "probe", "story", or "step"
+        - `story_name`: (for steps) The parent story name
+        
+        **Server**: This endpoint runs on a separate server (default port 9464) from the main API server.
       operationId: getMetrics
       responses:
         "200":
-          description: Prometheus metrics in text format
+          description: Prometheus metrics in text/plain format, ready for scraping
           content:
             text/plain:
               schema:
                 type: string
+              examples:
+                metrics:
+                  summary: Example Prometheus metrics output
+                  value: |
+                    # HELP xbp_runs_total Total number of probe/story runs
+                    # TYPE xbp_runs_total counter
+                    xbp_runs_total{name="api-health-check",type="probe"} 42
+                    
+                    # HELP xbp_duration_ms Probe/story execution duration in milliseconds
+                    # TYPE xbp_duration_ms histogram
+                    xbp_duration_ms_bucket{name="api-health-check",type="probe",le="100"} 10
+                    xbp_duration_ms_bucket{name="api-health-check",type="probe",le="500"} 35
+                    xbp_duration_ms_bucket{name="api-health-check",type="probe",le="+Inf"} 42
+                    
+                    # HELP xbp_errors_total Total number of errors
+                    # TYPE xbp_errors_total counter
+                    xbp_errors_total{name="api-health-check",type="probe"} 2
+                    
+                    # HELP xbp_status Current status (0=OK, 1=Error)
+                    # TYPE xbp_status gauge
+                    xbp_status{name="api-health-check",type="probe"} 0
         "400":
-          description: Bad request
+          description: Bad request - invalid request format
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+              examples:
+                badRequest:
+                  summary: Bad request example
+                  value:
+                    error: "Invalid request format"
 components:
   schemas:
     ProbeSummary:
       type: object
+      description: Summary information for a probe or story, showing current status and last execution time
       required:
         - name
         - status
@@ -242,19 +612,26 @@ components:
       properties:
         name:
           type: string
-          description: Probe or story name
+          description: The unique name of the probe or story as configured in the monitoring configuration file
+          example: "api-health-check"
         status:
           type: string
-          description: Last observed status
+          description: |
+            The current status of the probe or story based on the last execution.
+            - `OK`: The last execution was successful
+            - `FAILING`: The last execution failed or encountered an error
           enum:
             - OK
             - FAILING
+          example: "OK"
         last_probed:
           type: string
           format: date-time
-          description: Timestamp of the last run
+          description: ISO 8601 timestamp indicating when the probe or story was last executed
+          example: "2024-01-15T10:30:00Z"
     ProbeResult:
       type: object
+      description: Complete execution result for a single probe run, including success status, timing, and HTTP response details
       required:
         - probe_name
         - timestamp_started
@@ -262,21 +639,45 @@ components:
       properties:
         probe_name:
           type: string
+          description: The name of the probe that was executed
+          example: "api-health-check"
         timestamp_started:
           type: string
           format: date-time
+          description: ISO 8601 timestamp indicating when the probe execution started
+          example: "2024-01-15T10:30:00Z"
         success:
           type: boolean
+          description: |
+            Whether the probe execution was successful.
+            - `true`: Probe completed successfully and all expectations were met
+            - `false`: Probe failed due to network error, timeout, or unmet expectations
+          example: true
         error_message:
           type: string
           nullable: true
+          description: |
+            Human-readable error message if the probe failed.
+            Only present when `success` is `false`.
+            May include details about network errors, timeouts, or expectation failures.
+          example: "Connection timeout after 10s"
         response:
           $ref: "#/components/schemas/ProbeHttpResponse"
+          description: |
+            HTTP response details from the target endpoint.
+            Only present when `show_response=true` query parameter is set and the probe received a response.
+            May be `null` if the probe failed before receiving a response.
         trace_id:
           type: string
           nullable: true
+          description: |
+            OpenTelemetry trace ID for correlating this probe execution with distributed tracing systems.
+            Only present when OpenTelemetry tracing is enabled.
+            Use this ID to find the full trace in your observability platform.
+          example: "abc123def45678901234567890abcdef"
     ProbeHttpResponse:
       type: object
+      description: HTTP response details captured from the target endpoint during probe execution
       required:
         - timestamp_received
         - status_code
@@ -286,15 +687,32 @@ components:
         timestamp_received:
           type: string
           format: date-time
+          description: ISO 8601 timestamp indicating when the HTTP response was received from the target endpoint
+          example: "2024-01-15T10:30:00.123Z"
         status_code:
           type: integer
           format: int32
+          description: HTTP status code returned by the target endpoint (e.g., 200, 404, 500)
+          minimum: 100
+          maximum: 599
+          example: 200
         body:
           type: string
+          description: |
+            The raw HTTP response body as a string.
+            For JSON responses, this will be the JSON string.
+            May be truncated or redacted if the probe is marked as sensitive.
+          example: '{"status":"ok","version":"1.0.0"}'
         sensitive:
           type: boolean
+          description: |
+            Whether this response contains sensitive data.
+            When `true`, the response body may be redacted in logs and alerts.
+            Set in the probe configuration to protect sensitive information.
+          example: false
     StoryResult:
       type: object
+      description: Complete execution result for a story (multi-step workflow), including results for each individual step
       required:
         - story_name
         - timestamp_started
@@ -303,17 +721,30 @@ components:
       properties:
         story_name:
           type: string
+          description: The name of the story that was executed
+          example: "user-registration-flow"
         timestamp_started:
           type: string
           format: date-time
+          description: ISO 8601 timestamp indicating when the story execution started
+          example: "2024-01-15T10:30:00Z"
         success:
           type: boolean
+          description: |
+            Whether the entire story execution was successful.
+            - `true`: All steps completed successfully
+            - `false`: At least one step failed, causing the story to fail
+          example: true
         step_results:
           type: array
+          description: |
+            Array of results for each step in the story, in execution order.
+            Each step result includes its own success status, timing, and HTTP response details.
           items:
             $ref: "#/components/schemas/StepResult"
     StepResult:
       type: object
+      description: Execution result for a single step within a story workflow
       required:
         - step_name
         - timestamp_started
@@ -321,25 +752,57 @@ components:
       properties:
         step_name:
           type: string
+          description: The name of the step as defined in the story configuration
+          example: "create-user"
         timestamp_started:
           type: string
           format: date-time
+          description: ISO 8601 timestamp indicating when this step execution started
+          example: "2024-01-15T10:30:00Z"
         success:
           type: boolean
+          description: |
+            Whether this step execution was successful.
+            - `true`: Step completed successfully and all expectations were met
+            - `false`: Step failed due to network error, timeout, or unmet expectations
+          example: true
         error_message:
           type: string
           nullable: true
+          description: |
+            Human-readable error message if the step failed.
+            Only present when `success` is `false`.
+            May include details about network errors, timeouts, or expectation failures.
+          example: "Expected status code 201, got 500"
         response:
           $ref: "#/components/schemas/ProbeHttpResponse"
+          description: |
+            HTTP response details from the target endpoint for this step.
+            Only present when `show_response=true` query parameter is set and the step received a response.
+            May be `null` if the step failed before receiving a response.
         trace_id:
           type: string
           nullable: true
+          description: |
+            OpenTelemetry trace ID for correlating this step execution with distributed tracing systems.
+            All steps in a story share the same trace ID.
+            Only present when OpenTelemetry tracing is enabled.
+          example: "abc123def45678901234567890abcdef"
         span_id:
           type: string
           nullable: true
+          description: |
+            OpenTelemetry span ID uniquely identifying this step within the trace.
+            Each step has its own span ID.
+            Only present when OpenTelemetry tracing is enabled.
+          example: "span001"
     Error:
       type: object
+      description: Standard error response format returned for 4XX and 5XX status codes
+      required:
+        - error
       properties:
         error:
           type: string
-          description: Error message
+          description: Human-readable error message describing what went wrong
+          example: "Probe 'nonexistent-probe' not found"
