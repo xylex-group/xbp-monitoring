@@ -1,0 +1,47 @@
+probes:
+  - name: your-post
+    url: https://your.site/some/path
+    http_method: POST
+    with:
+      headers:
+        x-client-id: ClientId
+      body: '"{"test": true}"'
+    expectations:
+      - field: StatusCode
+        operation: Equals
+        value: "200"
+    schedule:
+      initial_delay: 0
+      interval: 60
+    alerts:
+      - url: https://notify.me/some/path
+    tags:
+      system: super-awesome-system
+      component: super-critical-component
+      owner: team
+
+stories:
+  - name: get-ip-user-flow
+    steps:
+      - name: get-ip
+        url: https://api.ipify.org/?format=json
+        http_method: GET
+        expectations:
+          - field: StatusCode
+            operation: Equals
+            value: "200"
+      - name: get-location
+        url: https://ipinfo.io/${{ steps.get-ip.body.ip }}/geo
+        http_method: GET
+        expectations:
+          - field: StatusCode
+            operation: Equals
+            value: "200"
+    schedule:
+      initial_delay: 0
+      interval: 20
+    alerts:
+      - url: https://webhook.site/54a9a526-c104-42a7-9b76-788e897390d8
+    tags:
+      team: team1
+      tier: sev0
