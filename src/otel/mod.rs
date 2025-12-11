@@ -3,8 +3,7 @@ use std::{env, time::Duration};
 use metrics::MetricsState;
 use opentelemetry_otlp::{ExportConfig, Protocol};
 use opentelemetry_sdk::{
-    resource::{EnvResourceDetector, ResourceDetector},
-    Resource,
+    resource::Resource,
 };
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
@@ -13,7 +12,7 @@ pub(crate) mod metrics;
 pub(crate) mod tracing;
 
 pub fn resource() -> Resource {
-    Resource::default().merge(&EnvResourceDetector::new().detect(Duration::from_secs(3)))
+    Resource::builder().build()
 }
 
 pub struct OtelGuard {
@@ -25,8 +24,6 @@ impl Drop for OtelGuard {
         if let Some(Err(err)) = self.metrics.meter.as_ref().map(|mp| mp.shutdown()) {
             eprintln!("Failed to shutdown meter provider: {err:?}");
         }
-
-        opentelemetry::global::shutdown_tracer_provider();
     }
 }
 
@@ -46,18 +43,20 @@ pub fn init() -> OtelGuard {
 
 fn create_otlp_export_config() -> ExportConfig {
     ExportConfig {
-        endpoint: env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
-            .unwrap_or_else(|_| "http://localhost:4317".to_string()),
+        endpoint: Some(
+            env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
+                .unwrap_or_else(|_| "http://localhost:4317".to_string()),
+        ),
         protocol: match env::var("OTEL_EXPORTER_OTLP_PROTOCOL") {
             Ok(protocol) if protocol == "http/protobuf" => Protocol::HttpBinary,
             Ok(protocol) if protocol == "http/json" => Protocol::HttpJson,
             _ => Protocol::Grpc,
         },
-        timeout: Duration::from_secs(
+        timeout: Some(Duration::from_secs(
             env::var("OTEL_EXPORTER_OTLP_TIMEOUT")
                 .unwrap_or_else(|_| "10".to_string())
                 .parse::<u64>()
                 .expect("OTEL_EXPORTER_OTLP_TIMEOUT must be a number"),
-        ),
+        )),
     }
 }

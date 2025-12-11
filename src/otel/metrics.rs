@@ -1,22 +1,41 @@
 use opentelemetry::{
     global,
-    metrics::{Counter, Gauge, Histogram, Unit},
+    metrics::{Counter, Gauge, Histogram},
 };
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{
-    metrics::{
-        reader::{DefaultAggregationSelector, DefaultTemporalitySelector, MetricReader},
-        MeterProviderBuilder, PeriodicReader, SdkMeterProvider,
-    },
-    runtime,
+use opentelemetry_otlp::{MetricExporter, WithExportConfig};
+use opentelemetry_sdk::metrics::{
+    reader::MetricReader, MeterProviderBuilder, PeriodicReader, SdkMeterProvider,
 };
 
-use std::{env, sync::Arc};
+use chrono::Utc;
+use std::{env, fs::OpenOptions, io::Write, sync::Arc};
 use tracing::debug;
 
 use crate::otel::create_otlp_export_config;
 
 use super::resource;
+
+// #region agent log
+fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("c:\\Users\\floris\\Documents\\GitHub\\xbp-monitoring\\.cursor\\debug.log")
+    {
+        if let Ok(line) = serde_json::to_string(&serde_json::json!({
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": Utc::now().timestamp_millis(),
+        })) {
+            let _ = writeln!(file, "{}", line);
+        }
+    }
+}
+// #endregion
 
 fn build_meter_provider<T>(reader: T) -> SdkMeterProvider
 where
@@ -34,50 +53,56 @@ pub struct MetricsState {
 }
 
 pub fn initialize() -> MetricsState {
-    let (meter_provider, prometheus_registry) = match env::var("OTEL_METRICS_EXPORTER") {
-        Ok(exporter_type) if exporter_type == "otlp" => {
+    let exporter_env = env::var("OTEL_METRICS_EXPORTER").ok();
+    // #region agent log
+    agent_log(
+        "A",
+        "metrics.rs:initialize",
+        "env OTEL_METRICS_EXPORTER",
+        serde_json::json!({ "value": exporter_env }),
+    );
+    // #endregion
+
+    let (meter_provider, prometheus_registry) = match exporter_env.as_deref() {
+        Some("otlp") => {
             debug!("Using OTLP metrics exporter");
             let export_config = create_otlp_export_config();
             let exporter = match export_config.protocol {
                 opentelemetry_otlp::Protocol::Grpc => {
                     debug!("Using OTLP gRPC exporter");
-                    opentelemetry_otlp::new_exporter()
-                        .tonic()
+                    MetricExporter::builder()
+                        .with_tonic()
                         .with_export_config(export_config)
-                        .build_metrics_exporter(
-                            Box::new(DefaultAggregationSelector::new()),
-                            Box::new(DefaultTemporalitySelector::new()),
-                        )
+                        .build()
                         .unwrap()
                 }
                 _ => {
                     debug!("Using OTLP HTTP exporter");
-                    match opentelemetry_otlp::new_exporter()
-                        .http()
-                        .with_protocol(export_config.protocol)
-                        .with_endpoint(format!("{}/v1/metrics", export_config.endpoint))
-                        // .with_export_config(export_config)
-                        .build_metrics_exporter(
-                            Box::new(DefaultAggregationSelector::new()),
-                            Box::new(DefaultTemporalitySelector::new()),
-                        ) {
-                        Ok(exporter) => exporter,
-                        Err(err) => {
-                            panic!("Failed to create OTLP HTTP metrics exporter: {}", err);
-                        }
-                    }
+                    let base_endpoint = export_config
+                        .endpoint
+                        .clone()
+                        .unwrap_or_else(|| "http://localhost:4318".to_string());
+                    MetricExporter::builder()
+                        .with_http()
+                        .with_export_config(export_config)
+                        .with_endpoint(format!(
+                            "{}/v1/metrics",
+                            base_endpoint.trim_end_matches('/')
+                        ))
+                        .build()
+                        .unwrap()
                 }
             };
-            let reader = PeriodicReader::builder(exporter, runtime::Tokio).build();
+            let reader = PeriodicReader::builder(exporter).build();
             (build_meter_provider(reader), None)
         }
-        Ok(exporter_type) if exporter_type == "stdout" => {
+        Some("stdout") => {
             debug!("Using stdout metrics exporter");
-            let exporter = opentelemetry_stdout::MetricsExporter::default();
-            let reader = PeriodicReader::builder(exporter, runtime::Tokio).build();
+            let exporter = opentelemetry_stdout::MetricExporter::default();
+            let reader = PeriodicReader::builder(exporter).build();
             (build_meter_provider(reader), None)
         }
-        Ok(exporter_type) if exporter_type == "prometheus" => {
+        Some("prometheus") => {
             debug!("Using Prometheus metrics exporter");
             let registry = prometheus::Registry::new();
             let reader = opentelemetry_prometheus::exporter()
@@ -88,6 +113,14 @@ pub fn initialize() -> MetricsState {
         }
         _ => {
             debug!("No metrics exporter configured");
+            // #region agent log
+            agent_log(
+                "B",
+                "metrics.rs:initialize",
+                "no exporter configured",
+                serde_json::json!({}),
+            );
+            // #endregion
             return MetricsState {
                 meter: None,
                 registry: None,
@@ -96,6 +129,14 @@ pub fn initialize() -> MetricsState {
     };
 
     global::set_meter_provider(meter_provider.clone());
+    // #region agent log
+    agent_log(
+        "B",
+        "metrics.rs:initialize",
+        "meter provider ready",
+        serde_json::json!({ "has_registry": prometheus_registry.is_some() }),
+    );
+    // #endregion
 
     MetricsState {
         meter: Some(meter_provider),
@@ -125,31 +166,39 @@ impl MonitorStatus {
 
 impl Metrics {
     pub fn new() -> Metrics {
-        let meter = opentelemetry::global::meter("prodzilla");
+        let meter: opentelemetry::metrics::Meter = opentelemetry::global::meter("xbp");
+        // #region agent log
+        agent_log(
+            "C",
+            "metrics.rs:new",
+            "meter created",
+            serde_json::json!({}),
+        );
+        // #endregion
         Metrics {
             duration: meter
                 .u64_histogram("duration")
-                .with_unit(Unit::new("ms"))
+                .with_unit("ms")
                 .with_description("request duration histogram in milliseconds")
-                .init(),
+                .build(),
             runs: meter
                 .u64_counter("runs")
-                .with_description("the total count of runs by monitor (story/probe)")
-                .init(),
+                .with_description("the total count of runs by monitor")
+                .build(),
             errors: meter
                 .u64_counter("errors")
-                .with_description("the total number of errors by monitor (story/probe)")
-                .init(),
+                .with_description("the total number of errors by monitor")
+                .build(),
             status: meter
                 .u64_gauge("status")
                 .with_description("the current status of each monitor OK = 0 Error = 1")
-                .init(),
+                .build(),
             http_status_code: meter
                 .u64_gauge("http_status_code")
                 .with_description(
                     "the current HTTP status code of the step, 0 if the HTTP call fails",
                 )
-                .init(),
+                .build(),
         }
     }
 }

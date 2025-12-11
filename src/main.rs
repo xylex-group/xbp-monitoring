@@ -16,7 +16,7 @@ use web_server::start_prometheus_server;
 
 use crate::{app_state::AppState, config::load_config};
 
-const XBP_YAML: &str = "prodzilla.yml";
+const XBP_YAML: &str = "xbp.yml";
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

@@ -6,23 +6,47 @@ use crate::errors::MapToSendError;
 use chrono::Utc;
 use lazy_static::lazy_static;
 use opentelemetry::KeyValue;
-use opentelemetry_semantic_conventions::trace as semconv;
 
 use opentelemetry::trace::FutureExt;
 use opentelemetry::trace::Span;
 use opentelemetry::trace::SpanId;
 use opentelemetry::trace::TraceId;
 
-use reqwest::header::HeaderMap;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::RequestBuilder;
+use http::HeaderMap as HttpHeaderMap;
 
 use super::model::EndpointResult;
 use super::model::ProbeInputParameters;
 use opentelemetry::trace::TraceContextExt;
 use opentelemetry::Context;
 use opentelemetry::{global, trace::Tracer};
+use std::fs::OpenOptions;
+use std::io::Write;
 
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 10;
+
+// #region agent log
+fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("c:\\Users\\floris\\Documents\\GitHub\\xbp-monitoring\\.cursor\\debug.log")
+    {
+        if let Ok(line) = serde_json::to_string(&serde_json::json!({
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": Utc::now().timestamp_millis(),
+        })) {
+            let _ = writeln!(file, "{}", line);
+        }
+    }
+}
+// #endregion
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::ClientBuilder::new()
@@ -70,13 +94,25 @@ pub async fn call_endpoint(
     };
     let span = cx.span();
     span.set_attributes(vec![
-        KeyValue::new(semconv::HTTP_METHOD, http_method.to_owned()),
-        KeyValue::new(semconv::HTTP_URL, url.clone()),
+        KeyValue::new("http.request.method", http_method.to_owned()),
+        KeyValue::new("url.full", url.clone()),
     ]);
     span.set_attribute(KeyValue::new(
-        semconv::HTTP_STATUS_CODE,
-        result.status_code.to_string(),
+        "http.response.status_code",
+        result.status_code as i64,
     ));
+    // #region agent log
+    agent_log(
+        "E",
+        "http_probe.rs:call_endpoint",
+        "response received",
+        serde_json::json!({
+            "method": http_method,
+            "url": url,
+            "status": result.status_code
+        }),
+    );
+    // #endregion
     if !sensitive {
         span.add_event(
             "response",
@@ -96,12 +132,22 @@ fn get_otel_headers(span_name: String) -> (HeaderMap, Context, SpanId, TraceId) 
     let trace_id = span.span_context().trace_id();
     let cx = Context::current_with_span(span);
 
-    let mut headers = HeaderMap::new();
+    let mut otel_headers = HttpHeaderMap::new();
     global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(&cx, &mut opentelemetry_http::HeaderInjector(&mut headers));
+        propagator.inject_context(&cx, &mut opentelemetry_http::HeaderInjector(&mut otel_headers));
     });
 
-    (headers, cx, span_id, trace_id)
+    let mut reqwest_headers = HeaderMap::new();
+    for (name, value) in otel_headers.iter() {
+        if let (Ok(req_name), Ok(req_value)) = (
+            HeaderName::from_bytes(name.as_str().as_bytes()),
+            HeaderValue::from_bytes(value.as_bytes()),
+        ) {
+            reqwest_headers.insert(req_name, req_value);
+        }
+    }
+
+    (reqwest_headers, cx, span_id, trace_id)
 }
 
 fn build_request(
