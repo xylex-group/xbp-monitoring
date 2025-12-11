@@ -1,7 +1,12 @@
 [package]
 name = "xbp-monitoring"
 version = "0.9.48"
+authors = ["Floris @ floris@xylex.group"]
+license = "MIT"
+readme = "README.md"
 edition = "2021"
+description = "XBP-Monitoring is a synthetic monitoring framework that simplifies and automates the entire process. Optionally used in conjuction as plugin to XBP base"
+
 
 [dependencies]
 axum = { version = "0.7.2" }
