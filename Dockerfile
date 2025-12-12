@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
-FROM rust:stable AS builder
+ARG RUST_IMAGE=rust:1.85-bookworm
+FROM ${RUST_IMAGE} AS builder
 
 WORKDIR /app
 
