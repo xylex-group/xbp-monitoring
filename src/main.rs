@@ -3,7 +3,6 @@ mod app_state;
 mod config;
 mod errors;
 mod otel;
-
 mod probe;
 mod web_server;
 
