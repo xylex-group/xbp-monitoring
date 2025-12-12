@@ -4,11 +4,11 @@ use opentelemetry::global;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
 
+use chrono::Utc;
 use opentelemetry_sdk::trace::{BatchSpanProcessor, SdkTracerProvider};
-use tracing::debug;
 use std::fs::OpenOptions;
 use std::io::Write;
-use chrono::Utc;
+use tracing::debug;
 
 use super::{create_otlp_export_config, resource};
 
@@ -68,10 +68,8 @@ pub fn create_tracer() {
                 .build()
         }
         Some("stdout") => {
-            let processor = BatchSpanProcessor::builder(
-                opentelemetry_stdout::SpanExporter::default()
-            )
-            .build();
+            let processor =
+                BatchSpanProcessor::builder(opentelemetry_stdout::SpanExporter::default()).build();
             SdkTracerProvider::builder()
                 .with_span_processor(processor)
                 .build()

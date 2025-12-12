@@ -1,10 +1,14 @@
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::probe::model::Probe;
 use crate::probe::model::Story;
+
+const DEFAULT_CONFIG_FILE: &str = "xbp.yaml";
+const LEGACY_CONFIG_FILE: &str = "xbp.yml";
+const DEFAULT_CONFIG_TEMPLATE: &str = include_str!("../xbp.yaml");
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -15,18 +19,57 @@ pub struct Config {
 }
 
 pub async fn load_config<P: Into<PathBuf>>(path: P) -> Result<Config, Box<dyn std::error::Error>> {
-    let path = path.into();
-    let config = match tokio::fs::read_to_string(path.clone()).await {
-        Ok(content) => content,
-        Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => {
-            panic!("Config file not found: {:?}", path)
+    let requested_path = path.into();
+
+    let mut candidates = Vec::with_capacity(2);
+    candidates.push(requested_path.clone());
+
+    if requested_path
+        .file_name()
+        .is_some_and(|name| name == LEGACY_CONFIG_FILE)
+    {
+        candidates.push(requested_path.with_file_name(DEFAULT_CONFIG_FILE));
+    }
+
+    for candidate in candidates {
+        match tokio::fs::read_to_string(candidate.clone()).await {
+            Ok(content) => {
+                let replaced = replace_env_vars(&content);
+                let config: Config = serde_yaml::from_str(&replaced)?;
+                return Ok(config);
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(e) => return Err(Box::new(e)),
         }
-        Err(e) => {
-            panic!("Failed to read config file: {:?}, err {}", path, e)
-        }
-    };
-    let config = replace_env_vars(&config);
-    let config: Config = serde_yaml::from_str(&config)?;
+    }
+
+    let is_defaultish = requested_path
+        .file_name()
+        .is_some_and(|name| name == DEFAULT_CONFIG_FILE || name == LEGACY_CONFIG_FILE);
+
+    if !is_defaultish {
+        return Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("Config file not found: {}", requested_path.display()),
+        )));
+    }
+
+    let create_in_dir = requested_path
+        .parent()
+        .map(PathBuf::from)
+        .unwrap_or(std::env::current_dir()?);
+    let create_path = create_in_dir.join(DEFAULT_CONFIG_FILE);
+
+    if tokio::fs::metadata(&create_path).await.is_err() {
+        info!(
+            "Config file not found, creating default at {}",
+            create_path.display()
+        );
+        tokio::fs::write(&create_path, DEFAULT_CONFIG_TEMPLATE).await?;
+    }
+
+    let replaced = replace_env_vars(DEFAULT_CONFIG_TEMPLATE);
+    let config: Config = serde_yaml::from_str(&replaced)?;
     Ok(config)
 }
 
@@ -51,12 +94,13 @@ pub fn replace_env_vars(content: &str) -> String {
 
 #[cfg(test)]
 mod config_tests {
-    use crate::{config::load_config, XBP_YAML};
     use std::env;
+
+    use crate::config::load_config;
 
     #[tokio::test]
     async fn test_app_yaml_can_load() {
-        let config_result = load_config(XBP_YAML).await;
+        let config_result = load_config("xbp.yaml").await;
 
         // Assert that the config is successfully loaded
         assert!(config_result.is_ok(), "Failed to load config");
@@ -78,5 +122,35 @@ mod config_tests {
             "Environment variable test_value should be replaced even with varying whitespace test_valuetest_value  test_valuetest_value, missing  should be empty",
             replaced
         );
+    }
+
+    #[tokio::test]
+    async fn test_legacy_xbp_yml_falls_back_to_xbp_yaml_in_same_dir() {
+        let dir =
+            std::env::temp_dir().join(format!("xbp-monitoring-test-{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+
+        let yaml_path = dir.join("xbp.yaml");
+        tokio::fs::write(&yaml_path, "probes: []\nstories: []\n")
+            .await
+            .unwrap();
+
+        let legacy_path = dir.join("xbp.yml");
+        let config = load_config(legacy_path).await.unwrap();
+        assert_eq!(0, config.probes.len());
+        assert_eq!(0, config.stories.len());
+    }
+
+    #[tokio::test]
+    async fn test_missing_default_creates_xbp_yaml() {
+        let dir =
+            std::env::temp_dir().join(format!("xbp-monitoring-test-{}", uuid::Uuid::new_v4()));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+
+        let target = dir.join("xbp.yaml");
+        let config = load_config(target.clone()).await.unwrap();
+        assert!(tokio::fs::metadata(&target).await.is_ok());
+        assert_eq!(1, config.probes.len());
+        assert_eq!(1, config.stories.len());
     }
 }

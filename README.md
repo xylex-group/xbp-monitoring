@@ -185,10 +185,10 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 ## Developer quickstart
 
 - Build/run:
-  - `cargo run -- --file xbp.yml`
+  - `cargo run -- --file xbp.yaml`
 - Format/lint:
   - `cargo fmt --all`
-  - `cargo clippy -D warnings`
+  - `cargo clippy -- -D warnings`
 - Tests:
   - `cargo test`
 
@@ -228,7 +228,7 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 
 ## Config entry points
 
-- Default config file is `xbp.yml`. Override via CLI: `--file <path>`.
+- Default config file is `xbp.yaml` (legacy `xbp.yml` is still supported). Override via CLI: `--file <path>`.
 - YAML loading and variable substitution live in `src/config.rs`.
 
 ## Telemetry for outbound HTTP

@@ -2,9 +2,7 @@ use std::{env, time::Duration};
 
 use metrics::MetricsState;
 use opentelemetry_otlp::{ExportConfig, Protocol};
-use opentelemetry_sdk::{
-    resource::Resource,
-};
+use opentelemetry_sdk::resource::Resource;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 

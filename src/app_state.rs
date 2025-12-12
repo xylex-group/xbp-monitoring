@@ -41,7 +41,8 @@ impl AppState {
     }
 
     pub fn add_story_result(&self, story_name: String, result: StoryResult) {
-        let mut write_lock: RwLockWriteGuard<'_, HashMap<String, Vec<_>>> = self.story_results.write().unwrap();
+        let mut write_lock: RwLockWriteGuard<'_, HashMap<String, Vec<_>>> =
+            self.story_results.write().unwrap();
 
         let results = write_lock.entry(story_name).or_default();
         results.push(result);

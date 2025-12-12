@@ -1,4 +1,3 @@
-
 use std::str::FromStr;
 use std::time::Duration;
 
@@ -12,9 +11,9 @@ use opentelemetry::trace::Span;
 use opentelemetry::trace::SpanId;
 use opentelemetry::trace::TraceId;
 
+use http::HeaderMap as HttpHeaderMap;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use reqwest::RequestBuilder;
-use http::HeaderMap as HttpHeaderMap;
 
 use super::model::EndpointResult;
 use super::model::ProbeInputParameters;
@@ -134,7 +133,10 @@ fn get_otel_headers(span_name: String) -> (HeaderMap, Context, SpanId, TraceId) 
 
     let mut otel_headers = HttpHeaderMap::new();
     global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(&cx, &mut opentelemetry_http::HeaderInjector(&mut otel_headers));
+        propagator.inject_context(
+            &cx,
+            &mut opentelemetry_http::HeaderInjector(&mut otel_headers),
+        );
     });
 
     let mut reqwest_headers = HeaderMap::new();
