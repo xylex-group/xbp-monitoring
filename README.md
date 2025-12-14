@@ -224,12 +224,56 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 - `/stories`
 - `/stories/:name/results`
 - `/stories/:name/trigger`
+- `/-/monitors`
+- `/-/reload` (POST)
 - `/metrics` (only when Prometheus metrics are enabled)
 
 ## Config entry points
 
-- Default config file is `xbp.yaml` (legacy `xbp.yml` is still supported). Override via CLI: `--file <path>`.
+- Default config file is `xbp.yaml`. Override via CLI: `--file <path>`.
+- Legacy `xbp.yml` is deprecated (it will log a warning); use `xbp.yaml` instead.
 - YAML loading and variable substitution live in `src/config.rs`.
+
+### Remote config (HTTPS JSON)
+
+Set `XBP_REMOTE_CONFIG_URL` to an `https://...` URL that returns a JSON payload matching `Config` (`{ probes: [], stories: [] }`). If set, it takes precedence over `--file`.
+
+Example JSON:
+
+```json
+{
+  "probes": [
+    {
+      "name": "example_probe",
+      "url": "https://example.com/health",
+      "http_method": "GET",
+      "with": null,
+      "expectations": null,
+      "schedule": { "initial_delay": 0, "interval": 60 },
+      "alerts": null,
+      "sensitive": false,
+      "tags": null
+    }
+  ],
+  "stories": []
+}
+```
+
+Environment variable substitution is applied to the fetched JSON (same `${{ env.VAR_NAME }}` semantics as YAML).
+
+### Daemon reload (systemctl daemon-reload equivalent)
+
+- Configure `XBP_RELOAD_TOKEN` (required).
+- Call `POST /-/reload` with header `x-xbp-reload-token: <token>`.
+
+This reloads config (from `XBP_REMOTE_CONFIG_URL` if set, otherwise from `--file`) and restarts all scheduled monitors.
+
+Examples:
+
+```bash
+curl http://localhost:3000/-/monitors
+curl -X POST -H "x-xbp-reload-token: supersecret" http://localhost:3000/-/reload
+```
 
 ## Telemetry for outbound HTTP
 

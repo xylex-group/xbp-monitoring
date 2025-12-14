@@ -12,3 +12,21 @@ pub struct ProbeResponse {
     pub status: String,
     pub last_probed: DateTime<Utc>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitorsResponse {
+    pub probes: Vec<String>,
+    pub stories: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReloadResponse {
+    pub reloaded: bool,
+    pub probes: Vec<String>,
+    pub stories: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+}

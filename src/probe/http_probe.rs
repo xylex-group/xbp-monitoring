@@ -56,6 +56,10 @@ lazy_static! {
         .unwrap();
 }
 
+pub(crate) fn shared_client() -> &'static reqwest::Client {
+    &CLIENT
+}
+
 pub async fn call_endpoint(
     http_method: &str,
     url: &String,

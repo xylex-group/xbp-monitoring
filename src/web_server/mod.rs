@@ -1,20 +1,25 @@
 mod model;
 mod probes;
 mod prometheus_metrics;
+mod reload;
 mod stories;
 
 use crate::web_server::{
     probes::{get_probe_results, probe_trigger, probes},
+    reload::{monitors, reload as reload_daemon},
     stories::{get_story_results, stories, story_trigger},
 };
-use axum::{routing::get, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use std::{env, sync::Arc};
 use tracing::{debug, info};
 
 use crate::app_state::AppState;
 
-pub async fn start_axum_server(app_state: Arc<AppState>) {
-    let app = Router::new()
+pub fn app_router(app_state: Arc<AppState>) -> Router {
+    Router::new()
         .route("/", get(root))
         .route("/probes", get(probes))
         .route("/probes/:name/results", get(get_probe_results))
@@ -22,7 +27,13 @@ pub async fn start_axum_server(app_state: Arc<AppState>) {
         .route("/stories", get(stories))
         .route("/stories/:name/results", get(get_story_results))
         .route("/stories/:name/trigger", get(story_trigger))
-        .layer(Extension(app_state.clone()));
+        .route("/-/monitors", get(monitors))
+        .route("/-/reload", post(reload_daemon))
+        .layer(Extension(app_state))
+}
+
+pub async fn start_axum_server(app_state: Arc<AppState>) {
+    let app = app_router(app_state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
 

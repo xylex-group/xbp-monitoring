@@ -66,12 +66,11 @@ pub async fn story_trigger(
 ) -> Json<StoryResult> {
     debug!("Story trigger called");
 
-    let story = &state
-        .config
-        .stories
-        .iter()
-        .find(|x| x.name == name)
-        .unwrap();
+    let story = {
+        let config = state.config.read().unwrap();
+        config.stories.iter().find(|x| x.name == name).cloned()
+    }
+    .unwrap();
 
     story.probe_and_store_result(state.clone()).await;
 

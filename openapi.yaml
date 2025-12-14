@@ -12,7 +12,7 @@ info:
     - **Metrics**: Prometheus-compatible metrics endpoint for observability
     
     ## Authentication
-    This API does not require authentication. All endpoints are publicly accessible.
+    This API does not require authentication for most endpoints. The reload endpoint requires a token header (`x-xbp-reload-token`) matching the `XBP_RELOAD_TOKEN` environment variable.
     
     ## Rate Limiting
     No rate limiting is currently enforced. Trigger endpoints execute probes/stories synchronously.
@@ -44,6 +44,8 @@ tags:
     description: Story management and results
   - name: Metrics
     description: Observability endpoints
+  - name: Admin
+    description: Administrative endpoints (reload, config inspection)
 paths:
   /:
     get:
@@ -600,6 +602,55 @@ paths:
                   summary: Bad request example
                   value:
                     error: "Invalid request format"
+  /-/monitors:
+    get:
+      tags:
+        - Admin
+      summary: List currently configured monitors
+      description: Returns the currently loaded probe and story names.
+      operationId: getMonitors
+      responses:
+        "200":
+          description: Monitor names
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonitorsResponse"
+  /-/reload:
+    post:
+      tags:
+        - Admin
+      summary: Reload configuration and restart monitors
+      description: |
+        Reloads config (from `XBP_REMOTE_CONFIG_URL` if set, otherwise from the configured `--file`) and restarts all scheduled monitors.
+        
+        Requires header `x-xbp-reload-token` matching the `XBP_RELOAD_TOKEN` environment variable.
+      operationId: reloadDaemon
+      parameters:
+        - name: x-xbp-reload-token
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reload succeeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReloadResponse"
+        "403":
+          description: Forbidden - missing or invalid reload token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Reload failed or token not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 components:
   schemas:
     ProbeSummary:
@@ -806,3 +857,34 @@ components:
           type: string
           description: Human-readable error message describing what went wrong
           example: "Probe 'nonexistent-probe' not found"
+    MonitorsResponse:
+      type: object
+      required:
+        - probes
+        - stories
+      properties:
+        probes:
+          type: array
+          items:
+            type: string
+        stories:
+          type: array
+          items:
+            type: string
+    ReloadResponse:
+      type: object
+      required:
+        - reloaded
+        - probes
+        - stories
+      properties:
+        reloaded:
+          type: boolean
+        probes:
+          type: array
+          items:
+            type: string
+        stories:
+          type: array
+          items:
+            type: string

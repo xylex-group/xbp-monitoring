@@ -2831,6 +2831,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
+ "tower 0.5.2",
  "tracing",
  "tracing-subscriber",
  "uuid",

@@ -62,7 +62,11 @@ pub async fn probe_trigger(
 ) -> Json<ProbeResult> {
     debug!("Probe trigger called");
 
-    let probe = &state.config.probes.iter().find(|x| x.name == name).unwrap();
+    let probe = {
+        let config = state.config.read().unwrap();
+        config.probes.iter().find(|x| x.name == name).cloned()
+    }
+    .unwrap();
 
     probe.probe_and_store_result(state.clone()).await;
 

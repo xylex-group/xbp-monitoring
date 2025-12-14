@@ -7,13 +7,11 @@ mod probe;
 mod web_server;
 
 use clap::Parser;
-use probe::schedule::schedule_probes;
-use probe::schedule::schedule_stories;
 use std::sync::Arc;
 use web_server::start_axum_server;
 use web_server::start_prometheus_server;
 
-use crate::{app_state::AppState, config::load_config};
+use crate::{app_state::AppState, config::load_config_from_sources};
 
 const XBP_YAML: &str = "xbp.yaml";
 
@@ -33,20 +31,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tokio::spawn(start_prometheus_server(registry.clone()));
     }
 
-    let config = load_config(args.file).await?;
+    let config = load_config_from_sources(args.file.clone()).await?;
 
-    let app_state = Arc::new(AppState::new(config));
+    let app_state = Arc::new(AppState::new(config, args.file));
 
-    start_monitoring(app_state.clone()).await?;
+    app_state.start_monitoring();
 
     start_axum_server(app_state.clone()).await;
 
-    Ok(())
-}
-
-async fn start_monitoring(app_state: Arc<AppState>) -> Result<(), Box<dyn std::error::Error>> {
-    schedule_probes(&app_state.config.probes, app_state.clone());
-    schedule_stories(&app_state.config.stories, app_state.clone());
     Ok(())
 }
 

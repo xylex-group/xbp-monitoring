@@ -381,10 +381,13 @@ mod probe_logic_tests {
         let step1_path = "/test1";
         let step2_path = "/test2";
         let story_name = "User Flow";
-        let app_state = Arc::new(AppState::new(Config {
+        let app_state = Arc::new(AppState::new(
+            Config {
             probes: vec![],
             stories: vec![],
-        }));
+            },
+            "xbp.yaml",
+        ));
 
         Mock::given(method("GET"))
             .and(path(step1_path))
@@ -445,10 +448,13 @@ mod probe_logic_tests {
         let step2_path = "/test2";
         let alert_path = "/alert-test";
         let story_name = "User Flow";
-        let app_state = Arc::new(AppState::new(Config {
+        let app_state = Arc::new(AppState::new(
+            Config {
             probes: vec![],
             stories: vec![],
-        }));
+            },
+            "xbp.yaml",
+        ));
 
         Mock::given(method("GET"))
             .and(path(step1_path))
@@ -526,10 +532,13 @@ mod probe_logic_tests {
         let step2_body_str = r#"{"uuid": "${{generate.uuid}}"}"#;
 
         let story_name = "User Flow";
-        let app_state = Arc::new(AppState::new(Config {
+        let app_state = Arc::new(AppState::new(
+            Config {
             probes: vec![],
             stories: vec![],
-        }));
+            },
+            "xbp.yaml",
+        ));
 
         Mock::given(method("GET"))
             .and(path(step1_path))

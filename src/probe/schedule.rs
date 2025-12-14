@@ -5,29 +5,39 @@ use tracing::info;
 
 use crate::probe::model::Probe;
 use crate::probe::probe_logic::Monitorable;
-use crate::AppState;
+use crate::app_state::AppState;
 
 use super::model::Story;
 
 // TODO: Can update these signatures to just use app_state
-pub fn schedule_probes(probes: &Vec<Probe>, app_state: Arc<AppState>) {
+pub fn schedule_probes(
+    probes: &Vec<Probe>,
+    app_state: Arc<AppState>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut handles = Vec::with_capacity(probes.len());
     for probe in probes {
         let probe_clone = probe.clone();
         let task_state = app_state.clone();
-        tokio::spawn(async move {
+        handles.push(tokio::spawn(async move {
             probing_loop(&probe_clone, task_state).await;
-        });
+        }));
     }
+    handles
 }
 
-pub fn schedule_stories(stories: &Vec<Story>, app_state: Arc<AppState>) {
+pub fn schedule_stories(
+    stories: &Vec<Story>,
+    app_state: Arc<AppState>,
+) -> Vec<tokio::task::JoinHandle<()>> {
+    let mut handles = Vec::with_capacity(stories.len());
     for story in stories {
         let story_clone = story.clone();
         let task_state = app_state.clone();
-        tokio::spawn(async move {
+        handles.push(tokio::spawn(async move {
             probing_loop(&story_clone, task_state).await;
-        });
+        }));
     }
+    handles
 }
 
 pub async fn probing_loop<T: Monitorable>(monitorable: &T, app_state: Arc<AppState>) {
@@ -101,9 +111,9 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config));
+        let app_state = Arc::new(AppState::new(config, "xbp.yaml"));
 
-        schedule_probes(&app_state.config.probes, app_state.clone());
+        let _handles = schedule_probes(&app_state.config.read().unwrap().probes, app_state.clone());
 
         // As delay and interval are 0, we'd expect that within 15 seconds our probe has been hit twice
         // One for first probe, then 10s timeout on request, then second probe
@@ -136,9 +146,9 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config));
+        let app_state = Arc::new(AppState::new(config, "xbp.yaml"));
 
-        schedule_probes(&app_state.config.probes, app_state.clone());
+        let _handles = schedule_probes(&app_state.config.read().unwrap().probes, app_state.clone());
 
         // As delay and interval are 0, we'd expect that within 15 seconds our probe has been hit twice
         // One for first probe, then 10s timeout on request, then second probe
