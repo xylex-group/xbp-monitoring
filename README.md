@@ -1,3 +1,5 @@
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/ocw6Rt?referralCode=mxPhG_&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 # Project overview
 
 - XBP-Monitoring is a Rust 2021 synthetic monitoring service using `axum` for HTTP, `tokio` runtime, `reqwest` for outbound calls, `tracing` for logs, and OpenTelemetry for traces/metrics. It exposes a JSON API and optionally a Prometheus endpoint.
