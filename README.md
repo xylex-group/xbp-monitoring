@@ -83,11 +83,15 @@ Copy `.env.example` to `.env` and configure as needed:
 
 #### Custom Environment Variables
 
-Any custom environment variables can be referenced in `xbp.yaml` config files using:
+Any custom environment variables can be referenced in `xbp.yml` config files using:
 
 ```yaml
 url: https://api.example.com/${{ env.API_KEY }}
 ```
+
+#### Operational Environment Variables
+
+- **`XBP_RESTART_CMD`** (optional) – Shell command that the dashboard calls when `/api/restart` is invoked. Examples: `systemctl restart xbp-monitoring` or a custom script that orchestrates the restart. Leave unset to keep the restart action disabled.
 
 ### GitHub Workflow Environment Variables
 
@@ -140,6 +144,14 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 - Prefer returning `Json<T>` with serializable DTOs from `src/web_server/model.rs`.
 - Avoid panics in handlers. If you touch these, replace `.unwrap()` with graceful error responses and proper status codes.
 - Honor `show_response` query param: if false, strip bodies before returning.
+
+## Web Dashboard
+
+- Visit `/dashboard` to open a lightweight cockpit for probes, stories, configuration, and restart controls.
+- Trigger buttons call `/probes/:name/trigger` or `/stories/:name/trigger` and update the detail panes via the same history endpoints.
+- The configuration editor reads and writes `xbp.yml` through `/api/config`; writes persist immediately but the service must restart before new settings take effect.
+- Pressing the restart button sends a POST to `/api/restart` and executes the shell command in `XBP_RESTART_CMD`.
+- **Building the dashboard**: before running `cargo run`, go to the `dashboard/` directory, install dependencies (`npm install`), and run `npm run build`. That produces the static files in `dashboard/out/`, which the Rust server serves at `/dashboard`.
 
 ## Config and YAML
 
@@ -243,6 +255,7 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 
 - Use `wiremock` for HTTP; avoid real network calls.
 - Keep tests deterministic with short, bounded delays only where necessary.
+
 
 ## Non-goals
 

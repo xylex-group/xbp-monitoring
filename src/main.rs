@@ -9,7 +9,7 @@ mod web_server;
 use clap::Parser;
 use probe::schedule::schedule_probes;
 use probe::schedule::schedule_stories;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use web_server::start_axum_server;
 use web_server::start_prometheus_server;
 
@@ -27,15 +27,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
-    let otel_state = otel::init();
+    let args: Args = Args::parse();
+    let otel_state: otel::OtelGuard = otel::init();
     if let Some(registry) = &otel_state.metrics.registry {
         tokio::spawn(start_prometheus_server(registry.clone()));
     }
 
-    let config = load_config(args.file).await?;
+    let config_path = PathBuf::from(&args.file);
+    let config: config::Config = load_config(config_path.clone()).await?;
 
-    let app_state = Arc::new(AppState::new(config));
+    let app_state: Arc<AppState> = Arc::new(AppState::new(config, config_path));
 
     start_monitoring(app_state.clone()).await?;
 

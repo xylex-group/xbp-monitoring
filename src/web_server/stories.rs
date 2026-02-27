@@ -1,4 +1,3 @@
-
 use axum::{
     extract::{Path, Query},
     Extension, Json,
@@ -24,9 +23,10 @@ pub async fn get_story_results(
 
     let show_response = params.show_response.unwrap_or(false);
     let read_lock = state.story_results.read().unwrap();
-    let results = read_lock.get(&name).unwrap();
-
-    let mut cloned_results: Vec<StoryResult> = results.clone();
+    let mut cloned_results: Vec<StoryResult> = read_lock
+        .get(&name)
+        .map(|results| results.clone())
+        .unwrap_or_default();
     cloned_results.reverse();
 
     if !show_response {
@@ -44,21 +44,31 @@ pub async fn stories(Extension(state): Extension<Arc<AppState>>) -> Json<Vec<Pro
     debug!("Get stories called");
 
     let read_lock = state.story_results.read().unwrap();
+    let mut response = Vec::with_capacity(state.config.stories.len());
 
-    let mut stories: Vec<ProbeResponse> = vec![];
+    for story in &state.config.stories {
+        let last_result = read_lock
+            .get(&story.name)
+            .and_then(|results| results.last());
+        let status = match last_result {
+            Some(last) => {
+                if last.success {
+                    "OK"
+                } else {
+                    "FAILING"
+                }
+            }
+            None => "PENDING",
+        };
 
-    for (key, value) in read_lock.iter() {
-        let last = value.last().unwrap();
-        let status = if last.success { "OK" } else { "FAILING" };
-
-        stories.push(ProbeResponse {
-            name: key.clone(),
+        response.push(ProbeResponse {
+            name: story.name.clone(),
             status: status.to_owned(),
-            last_probed: last.timestamp_started,
-        })
+            last_probed: last_result.map(|last| last.timestamp_started),
+        });
     }
 
-    Json(stories)
+    Json(response)
 }
 
 pub async fn story_trigger(

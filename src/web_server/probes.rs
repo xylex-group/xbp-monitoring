@@ -21,9 +21,10 @@ pub async fn get_probe_results(
 
     let show_response = params.show_response.unwrap_or(false);
     let read_lock = state.probe_results.read().unwrap();
-    let results = read_lock.get(&name).unwrap();
-
-    let mut cloned_results: Vec<ProbeResult> = results.clone();
+    let mut cloned_results: Vec<ProbeResult> = read_lock
+        .get(&name)
+        .map(|results| results.clone())
+        .unwrap_or_default();
     cloned_results.reverse();
 
     if !show_response {
@@ -39,21 +40,30 @@ pub async fn probes(Extension(state): Extension<Arc<AppState>>) -> Json<Vec<Prob
     debug!("Get probes called");
 
     let read_lock = state.probe_results.read().unwrap();
+    let mut response = Vec::with_capacity(state.config.probes.len());
 
-    let mut probes: Vec<ProbeResponse> = vec![];
-
-    for (key, value) in read_lock.iter() {
-        let last = value.last().unwrap();
-        let status = if last.success { "OK" } else { "FAILING" };
-
-        probes.push(ProbeResponse {
-            name: key.clone(),
+    for probe in &state.config.probes {
+        let last_result = read_lock
+            .get(&probe.name)
+            .and_then(|results| results.last());
+        let status = match last_result {
+            Some(last) => {
+                if last.success {
+                    "OK"
+                } else {
+                    "FAILING"
+                }
+            }
+            None => "PENDING",
+        };
+        response.push(ProbeResponse {
+            name: probe.name.clone(),
             status: status.to_owned(),
-            last_probed: last.timestamp_started,
-        })
+            last_probed: last_result.map(|last| last.timestamp_started),
+        });
     }
 
-    Json(probes)
+    Json(response)
 }
 
 pub async fn probe_trigger(

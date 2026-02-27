@@ -15,7 +15,7 @@ const CONTENT_TYPE: &str = "application/json";
 
 lazy_static! {
     static ref CLIENT: Client = ClientBuilder::new()
-        .user_agent("Prodzilla Alert/1.1")
+        .user_agent("XBP-Monitoring Alert/0.9.48")
         .build()
         .expect("Failed to build reqwest client");
 }
@@ -25,7 +25,6 @@ pub async fn send_alert_discord(
     probe_name: String,
     failure_timestamp: DateTime<Utc>,
 ) -> Result<u16, Box<dyn Error + Send>> {
-    let client: Client = Client::new();
     let webhook_url: String = alert.url.clone();
 
     let content: String = format!(
@@ -33,7 +32,7 @@ pub async fn send_alert_discord(
         probe_name, probe_name, failure_timestamp
     );
 
-    let alert_response: Response = client
+    let alert_response: Response = CLIENT
         .post(&webhook_url)
         .body(
             json!({

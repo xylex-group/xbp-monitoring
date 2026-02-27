@@ -39,7 +39,7 @@ pub async fn probing_loop<T: Monitorable>(monitorable: &T, app_state: Arc<AppSta
         Instant::now() + std::time::Duration::from_secs(schedule.initial_delay as u64);
 
     loop {
-        let now = Instant::now();
+        let now: Instant = Instant::now();
         if now < next_run_time {
             tokio::time::sleep(next_run_time - now).await;
         }
@@ -59,6 +59,7 @@ mod schedule_tests {
         probe_get_with_expected_status, probe_get_with_expected_status_and_alert,
     };
     use crate::AppState;
+    use std::path::PathBuf;
     use std::sync::Arc;
     use std::time::Duration;
     use std::vec;
@@ -101,7 +102,7 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config));
+        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml")));
 
         schedule_probes(&app_state.config.probes, app_state.clone());
 
@@ -136,7 +137,7 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config));
+        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml")));
 
         schedule_probes(&app_state.config.probes, app_state.clone());
 

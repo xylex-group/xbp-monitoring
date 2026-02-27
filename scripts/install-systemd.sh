@@ -46,13 +46,13 @@ cp "$BINARY_PATH" "$INSTALL_DIR/${BINARY_NAME}"
 chmod +x "$INSTALL_DIR/${BINARY_NAME}"
 chown root:root "$INSTALL_DIR/${BINARY_NAME}"
 
-if [ -f "xbp.yaml" ]; then
+if [ -f "xbp.yml" ]; then
     echo "Copying configuration file..."
-    cp xbp.yaml "$CONFIG_DIR/xbp.yaml"
-    chmod 644 "$CONFIG_DIR/xbp.yaml"
-    chown root:root "$CONFIG_DIR/xbp.yaml"
+    cp xbp.yml "$CONFIG_DIR/xbp.yml"
+    chmod 644 "$CONFIG_DIR/xbp.yml"
+    chown root:root "$CONFIG_DIR/xbp.yml"
 else
-    echo "Warning: xbp.yaml not found. You may need to create $CONFIG_DIR/xbp.yaml manually"
+    echo "Warning: xbp.yml not found. You may need to create $CONFIG_DIR/xbp.yml manually"
 fi
 
 echo "Creating systemd service file..."
@@ -66,7 +66,7 @@ Type=simple
 User=${SERVICE_USER}
 Group=${SERVICE_GROUP}
 WorkingDirectory=${CONFIG_DIR}
-ExecStart=${INSTALL_DIR}/${BINARY_NAME} --file ${CONFIG_DIR}/xbp.yaml
+ExecStart=${INSTALL_DIR}/${BINARY_NAME} --file ${CONFIG_DIR}/xbp.yml
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -105,5 +105,5 @@ echo "  Restart service:  systemctl restart ${SERVICE_NAME}"
 echo "  Stop service:     systemctl stop ${SERVICE_NAME}"
 echo "  Status:           systemctl status ${SERVICE_NAME}"
 echo ""
-echo "Configuration file: ${CONFIG_DIR}/xbp.yaml"
+echo "Configuration file: ${CONFIG_DIR}/xbp.yml"
 echo "Edit environment variables in: ${SERVICE_FILE}"

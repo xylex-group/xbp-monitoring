@@ -1,0 +1,20 @@
+- [x] Fix the yaml tests
+- [ ] Otel metrics exporter doesnt actually seem to export prometheus
+- [ ] Allow adding an API key or lock to the prometheus metrics endpoint or IP whitelist
+- [ ] Lean out the config loading and how its stored and not make it hardcoded
+- [ ] Make web interface to edit configs and see dashboard
+- [ ] Fix the docker image building and a latest tag
+- [ ] Add a docker-compose optionally with a postgres image in it
+- [ ] Optionally allow over the Athena SDK to talk to the DB
+- [ ] Optionally allow DB persistence
+- [ ] Uptime status page
+- [ ] Allow making it multi-tenanted 
+- [ ] Add an authentication to the web portal
+- [ ] Write complete documentation
+- [ ] Export more metrics to the prometheus metrics endpoint
+- [ ] Expand the internal management API to add probes
+- [ ] Expand the internal management API to add stories
+- [ ] Expand the internal management API to allow pausing the checks to specific stories or probes
+- [ ] Make the probes/stories more complex to even allow things like SQL running or websocket pinging
+- [ ] Allow heartbeats
+- [ ] Interface this fully in sync with the XBP CLI

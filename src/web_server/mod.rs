@@ -1,14 +1,22 @@
+mod config_api;
 mod model;
 mod probes;
 mod prometheus_metrics;
+mod restart;
 mod stories;
 
 use crate::web_server::{
+    config_api::{get_config, put_config},
     probes::{get_probe_results, probe_trigger, probes},
+    restart::restart,
     stories::{get_story_results, stories, story_trigger},
 };
-use axum::{routing::get, Extension, Router};
+use axum::{
+    routing::{get, post},
+    Extension, Router,
+};
 use std::{env, sync::Arc};
+use tower_http::services::ServeDir;
 use tracing::{debug, info};
 
 use crate::app_state::AppState;
@@ -16,12 +24,18 @@ use crate::app_state::AppState;
 pub async fn start_axum_server(app_state: Arc<AppState>) {
     let app = Router::new()
         .route("/", get(root))
+        .nest_service(
+            "/dashboard",
+            ServeDir::new("dashboard/out").append_index_html_on_directories(true),
+        )
         .route("/probes", get(probes))
         .route("/probes/:name/results", get(get_probe_results))
         .route("/probes/:name/trigger", get(probe_trigger))
         .route("/stories", get(stories))
         .route("/stories/:name/results", get(get_story_results))
         .route("/stories/:name/trigger", get(story_trigger))
+        .route("/api/config", get(get_config).put(put_config))
+        .route("/api/restart", post(restart))
         .layer(Extension(app_state.clone()));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -32,7 +46,7 @@ pub async fn start_axum_server(app_state: Arc<AppState>) {
 }
 
 pub async fn start_prometheus_server(registry: Arc<prometheus::Registry>) {
-    let host = match env::var("OTEL_EXPORTER_PROMETHEUS_HOST") {
+    let host: String = match env::var("OTEL_EXPORTER_PROMETHEUS_HOST") {
         Ok(host) => host,
         Err(_) => "localhost".to_owned(),
     };
@@ -40,7 +54,7 @@ pub async fn start_prometheus_server(registry: Arc<prometheus::Registry>) {
         Ok(port) => port,
         Err(_) => "9464".to_owned(),
     };
-    let app = Router::new()
+    let app: Router = Router::new()
         .route("/metrics", get(prometheus_metrics::metrics_handler))
         .layer(Extension(registry));
 

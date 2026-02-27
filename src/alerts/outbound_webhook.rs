@@ -13,7 +13,7 @@ const REQUEST_TIMEOUT_SECS: u64 = 10;
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::ClientBuilder::new()
-        .user_agent("Prodzilla Alert/1.0")
+        .user_agent("XBP-Monitoring Alert/0.9.48")
         .build()
         .unwrap();
 }
@@ -30,9 +30,9 @@ pub async fn alert_if_failure(
     if success {
         return Ok(());
     }
-    let error_message = error.unwrap_or("No error message");
-    let status_code = probe_response.map(|r| r.status_code);
-    let truncated_body = match probe_response {
+    let error_message: &str = error.unwrap_or("No error message");
+    let status_code: Option<u32> = probe_response.map(|r| r.status_code);
+    let truncated_body: Option<String> = match probe_response {
         Some(r) if !r.sensitive => Some(r.truncated_body(500)),
         Some(_) => Some("Redacted".to_owned()),
         None => None,
@@ -47,7 +47,7 @@ pub async fn alert_if_failure(
         status_code.map_or("N/A".to_owned(), |code| code.to_string()),
         log_body,
     );
-    let mut errors = Vec::new();
+    let mut errors: Vec<Box<dyn std::error::Error + Send>> = Vec::new();
     if let Some(alerts_vec) = alerts {
         for alert in alerts_vec {
             if let Err(e) = send_alert(
@@ -78,12 +78,12 @@ pub async fn send_generic_webhook(
     body: String,
     content_type: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send>> {
-    let request = CLIENT
+    let request: reqwest::RequestBuilder = CLIENT
         .post(url)
         .body(body)
         .header("content-type", content_type);
 
-    let alert_response = request
+    let alert_response: reqwest::Response = request
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .send()
         .await
@@ -105,7 +105,7 @@ pub async fn send_webhook_alert(
     failure_timestamp: DateTime<Utc>,
     trace_id: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send>> {
-    let request_body = WebhookNotification {
+    let request_body: WebhookNotification = WebhookNotification {
         message: "Probe failed.".to_owned(),
         probe_name,
         error_message: error_message.to_owned(),
@@ -115,7 +115,7 @@ pub async fn send_webhook_alert(
         status_code,
     };
 
-    let json = serde_json::to_string(&request_body).map_to_send_err()?;
+    let json: String = serde_json::to_string(&request_body).map_to_send_err()?;
     send_generic_webhook(url, json, "application/json").await
 }
 
@@ -129,7 +129,7 @@ pub async fn send_slack_alert(
     trace_id: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send>> {
     // Uses Slack's Block Kit UI to make the message prettier
-    let mut blocks = vec![
+    let mut blocks: Vec<SlackBlock> = vec![
         SlackBlock {
             r#type: "header".to_owned(),
             text: Some(SlackTextBlock {
@@ -184,8 +184,8 @@ pub async fn send_slack_alert(
         ]),
         text: None,
     });
-    let request_body = SlackNotification { blocks };
-    let json = serde_json::to_string(&request_body).map_to_send_err()?;
+    let request_body: SlackNotification = SlackNotification { blocks };
+    let json: String = serde_json::to_string(&request_body).map_to_send_err()?;
     send_generic_webhook(webhook_url, json, "application/json").await
 }
 
@@ -198,7 +198,7 @@ pub async fn send_alert(
     failure_timestamp: DateTime<Utc>,
     trace_id: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error + Send>> {
-    let domain = alert.url.split('/').nth(2).unwrap_or("");
+    let domain: &str = alert.url.split('/').nth(2).unwrap_or("");
     match domain {
         "hooks.slack.com" => {
             send_slack_alert(
@@ -239,9 +239,9 @@ mod webhook_tests {
 
     #[tokio::test]
     async fn test_failure_gets_alerted() {
-        let mock_server = MockServer::start().await;
+        let mock_server: MockServer = MockServer::start().await;
 
-        let alert_url = "/alert-test";
+        let alert_url: &str = "/alert-test";
 
         Mock::given(method("POST"))
             .and(path(alert_url))

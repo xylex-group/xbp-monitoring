@@ -1,17 +1,18 @@
 use std::error::Error;
+use std::fmt::{Formatter, Result as FmtResult};
 
 use crate::probe::model::{ExpectField, ExpectOperation};
 
 pub trait MapToSendError<T, E> {
-    fn map_to_send_err(self) -> Result<T, Box<dyn std::error::Error + Send>>;
+    fn map_to_send_err(self) -> Result<T, Box<dyn Error + Send>>;
 }
 
 impl<T, E> MapToSendError<T, E> for Result<T, E>
 where
-    E: std::error::Error + Send + 'static,
+    E: Error + Send + 'static,
 {
-    fn map_to_send_err(self) -> Result<T, Box<dyn std::error::Error + Send>> {
-        self.map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send>)
+    fn map_to_send_err(self) -> Result<T, Box<dyn Error + Send>> {
+        self.map_err(|e| Box::new(e) as Box<dyn Error + Send>)
     }
 }
 
@@ -26,7 +27,7 @@ pub struct ExpectationFailedError {
 impl Error for ExpectationFailedError {}
 
 impl std::fmt::Display for ExpectationFailedError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
             "Failed to meet expectation for field '{:?}' with operation {:?} {:?}.",
@@ -36,7 +37,7 @@ impl std::fmt::Display for ExpectationFailedError {
 }
 
 impl std::fmt::Debug for ExpectationFailedError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> FmtResult {
         write!(
             f,
             "Failed to meet expectation for field '{:?}' with operation {:?} {:?}. Received: status '{}', body '{}'",

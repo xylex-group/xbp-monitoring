@@ -1,5 +1,5 @@
 use std::sync::RwLockWriteGuard;
-use std::{collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, path::PathBuf, sync::RwLock};
 
 use crate::{
     config::Config,
@@ -14,15 +14,17 @@ pub struct AppState {
     pub probe_results: RwLock<HashMap<String, Vec<ProbeResult>>>,
     pub story_results: RwLock<HashMap<String, Vec<StoryResult>>>,
     pub config: Config,
+    pub config_path: PathBuf,
     pub metrics: Metrics,
 }
 
 impl AppState {
-    pub fn new(config: Config) -> AppState {
+    pub fn new(config: Config, config_path: PathBuf) -> AppState {
         AppState {
             probe_results: RwLock::new(HashMap::new()),
             story_results: RwLock::new(HashMap::new()),
             config,
+            config_path,
             metrics: Metrics::new(),
         }
     }
@@ -31,7 +33,7 @@ impl AppState {
         let mut write_lock: RwLockWriteGuard<'_, HashMap<String, Vec<_>>> =
             self.probe_results.write().unwrap();
 
-        let results = write_lock.entry(probe_name).or_default();
+        let results: &mut Vec<ProbeResult> = write_lock.entry(probe_name).or_default();
         results.push(result);
 
         // Ensure only the latest 100 elements are kept
@@ -41,9 +43,10 @@ impl AppState {
     }
 
     pub fn add_story_result(&self, story_name: String, result: StoryResult) {
-        let mut write_lock: RwLockWriteGuard<'_, HashMap<String, Vec<_>>> = self.story_results.write().unwrap();
+        let mut write_lock: RwLockWriteGuard<'_, HashMap<String, Vec<_>>> =
+            self.story_results.write().unwrap();
 
-        let results = write_lock.entry(story_name).or_default();
+        let results: &mut Vec<StoryResult> = write_lock.entry(story_name).or_default();
         results.push(result);
 
         // Ensure only the latest 100 elements are kept
