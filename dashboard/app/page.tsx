@@ -1,332 +1,348 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Button, Chip, Spinner, Table } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import Link from "next/link";
+import { listProbeStatuses, getProbeResults } from "@/lib/api";
+import type { ProbeResult, ProbeStatus } from "@/lib/types";
+import { ResultsDrawer } from "@/components/ResultsDrawer";
+import { useToast } from "@/components/ToastProvider";
 
-type ProbeSummary = {
-  name: string;
-  status: string;
-  last_probed?: string | null;
-};
+const STATUS_COLOR = {
+  OK: "success",
+  FAILING: "danger",
+  PENDING: "warning",
+} as const;
 
-type StorySummary = {
-  name: string;
-  status: string;
-  last_probed?: string | null;
-};
+const STATUS_ICON = {
+  OK: "gravity-ui:circle-check-fill",
+  FAILING: "gravity-ui:circle-xmark-fill",
+  PENDING: "gravity-ui:circle-dashed",
+} as const;
 
-type StatusMessage = {
-  config?: string;
-  probe?: string;
-  story?: string;
-  restart?: string;
+interface RecentResult {
+  probeName: string;
+  result: ProbeResult;
+}
+
+const STATUS_STYLES = {
+  OK: {
+    iconClass: "text-success",
+    chipColor: "success" as const,
+    toneClass: "bg-success/10 border-success/30",
+  },
+  FAILING: {
+    iconClass: "text-danger",
+    chipColor: "danger" as const,
+    toneClass: "bg-danger/10 border-danger/30",
+  },
+  PENDING: {
+    iconClass: "text-warning",
+    chipColor: "warning" as const,
+    toneClass: "bg-warning/10 border-warning/30",
+  },
 };
 
 export default function DashboardPage() {
-  const [probes, setProbes] = useState<ProbeSummary[]>([]);
-  const [stories, setStories] = useState<StorySummary[]>([]);
-  const [selectedProbe, setSelectedProbe] = useState("");
-  const [selectedStory, setSelectedStory] = useState("");
-  const [probeResults, setProbeResults] = useState("Select a probe to view the latest results.");
-  const [storyResults, setStoryResults] = useState("Select a story to inspect recent executions.");
-  const [configContent, setConfigContent] = useState("");
-  const [statusMessage, setStatusMessage] = useState<StatusMessage>({});
+  const { toast } = useToast();
+  const [statuses, setStatuses] = useState<ProbeStatus[]>([]);
+  const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resultsProbe, setResultsProbe] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const probeStatuses = await listProbeStatuses();
+      setStatuses(probeStatuses);
+
+      // Fetch last result for each failing probe (up to 5)
+      const failing = probeStatuses
+        .filter((s) => s.status === "FAILING")
+        .slice(0, 5);
+
+      const resultsSettled = await Promise.allSettled(
+        failing.map(async (s) => {
+          const results = await getProbeResults(s.name);
+          return results[0] ? { probeName: s.name, result: results[0] } : null;
+        })
+      );
+      const recent: RecentResult[] = resultsSettled
+        .filter(
+          (r): r is PromiseFulfilledResult<RecentResult> =>
+            r.status === "fulfilled" && r.value !== null
+        )
+        .map((r) => r.value);
+      setRecentResults(recent);
+      setLastUpdated(new Date());
+    } catch (err) {
+      toast(String(err), { variant: "danger" });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    refreshOverview();
-    loadConfig();
-    const interval = setInterval(refreshOverview, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    load();
+    const id = setInterval(load, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
 
-  useEffect(() => {
-    if (probes.length && !probes.some((probe) => probe.name === selectedProbe)) {
-      setSelectedProbe(probes[0].name);
-    }
-  }, [probes, selectedProbe]);
+  const stats = useMemo(() => {
+    const ok = statuses.filter((s) => s.status === "OK").length;
+    const failing = statuses.filter((s) => s.status === "FAILING").length;
+    const pending = statuses.filter((s) => s.status === "PENDING").length;
+    return { total: statuses.length, ok, failing, pending };
+  }, [statuses]);
 
-  useEffect(() => {
-    if (stories.length && !stories.some((story) => story.name === selectedStory)) {
-      setSelectedStory(stories[0].name);
-    }
-  }, [stories, selectedStory]);
-
-  useEffect(() => {
-    if (selectedProbe) {
-      loadProbeResults(selectedProbe);
-    }
-  }, [selectedProbe]);
-
-  useEffect(() => {
-    if (selectedStory) {
-      loadStoryResults(selectedStory);
-    }
-  }, [selectedStory]);
-
-  async function refreshOverview() {
-    await Promise.all([loadProbes(), loadStories()]);
-  }
-
-  async function fetchJson<T>(url: string): Promise<T> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }
-
-  function formatTimestamp(value?: string | null) {
-    return value ? new Date(value).toLocaleString() : "Never";
-  }
-
-  async function loadProbes() {
-    try {
-      const data = await fetchJson<ProbeSummary[]>("/probes");
-      setProbes(data);
-    } catch (error) {
-      setProbeResults(`Unable to load probes: ${error}`);
-      setProbes([]);
-    }
-  }
-
-  async function loadStories() {
-    try {
-      const data = await fetchJson<StorySummary[]>("/stories");
-      setStories(data);
-    } catch (error) {
-      setStoryResults(`Unable to load stories: ${error}`);
-      setStories([]);
-    }
-  }
-
-  async function loadProbeResults(name: string) {
-    try {
-      const response = await fetch(`/probes/${encodeURIComponent(name)}/results?show_response=true`);
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = await response.json();
-      setProbeResults(JSON.stringify(payload, null, 2));
-    } catch (error) {
-      setProbeResults(`Error fetching probe results: ${error}`);
-    }
-  }
-
-  async function loadStoryResults(name: string) {
-    try {
-      const response = await fetch(`/stories/${encodeURIComponent(name)}/results?show_response=true`);
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = await response.json();
-      setStoryResults(JSON.stringify(payload, null, 2));
-    } catch (error) {
-      setStoryResults(`Error fetching story results: ${error}`);
-    }
-  }
-
-  async function triggerProbe(name: string) {
-    if (!name) return;
-    setStatusMessage((prev) => ({ ...prev, probe: "Triggering probe…" }));
-    try {
-      const payload = await fetchJson<{ timestamp_started?: string }>(`/probes/${encodeURIComponent(name)}/trigger`);
-      setStatusMessage((prev) => ({
-        ...prev,
-        probe: payload.timestamp_started
-          ? `Probe triggered at ${new Date(payload.timestamp_started).toLocaleTimeString()}.`
-          : "Probe triggered."
-      }));
-      await refreshOverview();
-      await loadProbeResults(name);
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, probe: `Trigger failed: ${error}` }));
-    }
-  }
-
-  async function triggerStory(name: string) {
-    if (!name) return;
-    setStatusMessage((prev) => ({ ...prev, story: "Triggering story…" }));
-    try {
-      const payload = await fetchJson<{ timestamp_started?: string }>(`/stories/${encodeURIComponent(name)}/trigger`);
-      setStatusMessage((prev) => ({
-        ...prev,
-        story: payload.timestamp_started
-          ? `Story triggered at ${new Date(payload.timestamp_started).toLocaleTimeString()}.`
-          : "Story triggered."
-      }));
-      await refreshOverview();
-      await loadStoryResults(name);
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, story: `Trigger failed: ${error}` }));
-    }
-  }
-
-  async function loadConfig() {
-    try {
-      const response = await fetch("/api/config");
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const text = await response.text();
-      setConfigContent(text);
-      setStatusMessage((prev) => ({ ...prev, config: "Config loaded." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, config: `Unable to load config: ${error}` }));
-    }
-  }
-
-  async function saveConfig() {
-    setStatusMessage((prev) => ({ ...prev, config: "Saving config…" }));
-    try {
-      const response = await fetch("/api/config", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "text/yaml"
-        },
-        body: configContent
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      setStatusMessage((prev) => ({ ...prev, config: "Config saved. Restart required to apply changes." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, config: `Save failed: ${error}` }));
-    }
-  }
-
-  async function restartServer() {
-    setStatusMessage((prev) => ({ ...prev, restart: "Sending restart request…" }));
-    try {
-      const response = await fetch("/api/restart", {
-        method: "POST"
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      setStatusMessage((prev) => ({ ...prev, restart: "Restart requested." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, restart: `Restart failed: ${error}` }));
-    }
-  }
+  const healthPct =
+    stats.total > 0 ? Math.round((stats.ok / stats.total) * 100) : 100;
 
   return (
-    <>
-      <header>
-        <p>Lightweight control center for the monitoring runtime.</p>
-        <h1>XBP Monitoring</h1>
-      </header>
-      <main className="page-container">
-        <section className="panel">
-          <h2>Overview</h2>
-          <div className="grid">
-            <div>
-              <h3>Probes</h3>
-              <div className="overview-grid">
-                {probes.length === 0 && <p>Loading probes…</p>}
-                {probes.map((probe) => (
-                  <div className={`overview-card ${probe.status.toLowerCase()}`} key={probe.name}>
-                    <div>
-                      <div className="card-title">{probe.name}</div>
-                      <div className="card-subtitle">Last probed {formatTimestamp(probe.last_probed)}</div>
+    <div className="flex flex-col gap-8 pb-2">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
+          <p className="text-sm text-muted mt-0.5">
+            Real-time health of all HTTP probes
+          </p>
+          {lastUpdated && (
+            <p className="text-xs text-muted mt-1">
+              Last updated: {lastUpdated.toLocaleTimeString()}
+            </p>
+          )}
+        </div>
+        <Button variant="ghost" onPress={load}>
+          <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
+          Refresh
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-24">
+          <Spinner size="lg" />
+        </div>
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {[
+              {
+                label: "Total Monitors",
+                value: stats.total,
+                icon: "gravity-ui:pulse",
+                color: "text-foreground",
+                bg: "bg-default/10",
+              },
+              {
+                label: "Healthy",
+                value: stats.ok,
+                icon: STATUS_ICON.OK,
+                color: "text-success",
+                bg: "bg-success/10",
+              },
+              {
+                label: "Failing",
+                value: stats.failing,
+                icon: STATUS_ICON.FAILING,
+                color: "text-danger",
+                bg: "bg-danger/10",
+              },
+              {
+                label: "Pending",
+                value: stats.pending,
+                icon: STATUS_ICON.PENDING,
+                color: "text-warning",
+                bg: "bg-warning/10",
+              },
+            ].map(({ label, value, icon, color, bg }) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-border bg-surface p-5 flex items-center gap-4 shadow-sm"
+              >
+                <div className={`rounded-lg p-2.5 ${bg}`}>
+                  <Icon icon={icon} className={`size-5 ${color}`} />
+                </div>
+                <div>
+                  <p className="text-3xl font-bold leading-none tabular-nums">{value}</p>
+                  <p className="text-xs text-muted mt-1">{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Health bar */}
+          <div className="rounded-2xl border border-border bg-surface p-5 flex flex-col gap-3 shadow-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Overall Health</span>
+              <span
+                className={`text-sm font-bold ${
+                  healthPct === 100
+                    ? "text-success"
+                    : healthPct >= 80
+                    ? "text-warning"
+                    : "text-danger"
+                }`}
+              >
+                {healthPct}%
+              </span>
+            </div>
+            <div className="h-2.5 rounded-full bg-border overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${
+                  healthPct === 100
+                    ? "bg-success"
+                    : healthPct >= 80
+                    ? "bg-warning"
+                    : "bg-danger"
+                }`}
+                style={{ width: `${healthPct}%` }}
+              />
+            </div>
+            {stats.failing > 0 && (
+              <p className="text-xs text-danger">
+                {stats.failing} monitor{stats.failing > 1 ? "s are" : " is"} currently failing
+              </p>
+            )}
+          </div>
+
+          {/* All monitors table */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">All Monitors</h2>
+              <Link href="/monitors">
+                <Button size="sm" variant="ghost">
+                  Manage
+                  <Icon icon="gravity-ui:arrow-right" className="size-3" />
+                </Button>
+              </Link>
+            </div>
+
+            {statuses.length === 0 ? (
+              <div className="rounded-2xl border border-border bg-surface p-8 text-center shadow-sm">
+                <Icon
+                  icon="gravity-ui:pulse"
+                  className="size-8 text-muted mx-auto mb-3"
+                />
+                <p className="text-sm text-muted">No monitors configured yet.</p>
+                <Link href="/monitors">
+                  <Button size="sm" className="mt-3">
+                    Add Monitor
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <Table>
+                <Table.ScrollContainer>
+                  <Table.Content aria-label="Monitor status" className="min-w-[560px]">
+                    <Table.Header>
+                      <Table.Column isRowHeader>Monitor</Table.Column>
+                      <Table.Column>Status</Table.Column>
+                      <Table.Column>Last Probed</Table.Column>
+                      <Table.Column className="text-end">Details</Table.Column>
+                    </Table.Header>
+                    <Table.Body>
+                      {statuses.map((s) => (
+                        <Table.Row key={s.name} id={s.name}>
+                          <Table.Cell className="font-medium">{s.name}</Table.Cell>
+                          <Table.Cell>
+                            <div className="flex items-center gap-2">
+                              <Icon
+                                icon={STATUS_ICON[s.status]}
+                                className={`size-4 ${STATUS_STYLES[s.status].iconClass}`}
+                              />
+                              <Chip
+                                size="sm"
+                                variant="soft"
+                                color={STATUS_STYLES[s.status].chipColor}
+                              >
+                                {s.status}
+                              </Chip>
+                            </div>
+                          </Table.Cell>
+                          <Table.Cell className="text-xs text-muted">
+                            {s.last_probed
+                              ? new Date(s.last_probed).toLocaleString()
+                              : "Never"}
+                          </Table.Cell>
+                          <Table.Cell>
+                            <div className="flex justify-end">
+                              <Button
+                                isIconOnly
+                                size="sm"
+                                variant="ghost"
+                                onPress={() => setResultsProbe(s.name)}
+                              >
+                                <Icon icon="gravity-ui:eye" className="size-4" />
+                              </Button>
+                            </div>
+                          </Table.Cell>
+                        </Table.Row>
+                      ))}
+                    </Table.Body>
+                  </Table.Content>
+                </Table.ScrollContainer>
+              </Table>
+            )}
+          </div>
+
+          {/* Failing probes — last error */}
+          {recentResults.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <h2 className="font-semibold text-danger">Recent Failures</h2>
+              <div className="flex flex-col gap-3">
+                {recentResults.map(({ probeName, result }) => (
+                  <div
+                    key={probeName}
+                    className={`rounded-2xl border p-4 flex flex-col gap-2 shadow-sm ${STATUS_STYLES.FAILING.toneClass}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon
+                          icon={STATUS_ICON.FAILING}
+                          className="size-4 text-danger"
+                        />
+                        <span className="font-medium text-sm">{probeName}</span>
+                      </div>
+                      <span className="text-xs text-muted">
+                        {new Date(result.timestamp_started).toLocaleString()}
+                      </span>
                     </div>
-                    <span className="status-badge">{probe.status}</span>
+                    {result.error_message && (
+                      <p className="text-xs text-danger font-mono bg-danger/10 rounded-lg px-3 py-2">
+                        {result.error_message}
+                      </p>
+                    )}
+                    {result.response && (
+                      <p className="text-xs text-muted">
+                        HTTP {result.response.status_code}
+                      </p>
+                    )}
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => setResultsProbe(probeName)}
+                      >
+                        View all results
+                        <Icon icon="gravity-ui:arrow-right" className="size-3" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
-            <div>
-              <h3>Stories</h3>
-              <div className="overview-grid">
-                {stories.length === 0 && <p>Loading stories…</p>}
-                {stories.map((story) => (
-                  <div className={`overview-card ${story.status.toLowerCase()}`} key={story.name}>
-                    <div>
-                      <div className="card-title">{story.name}</div>
-                      <div className="card-subtitle">Last probed {formatTimestamp(story.last_probed)}</div>
-                    </div>
-                    <span className="status-badge">{story.status}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
+          )}
+        </>
+      )}
 
-        <section className="panel" aria-live="polite">
-          <h2>Probe details</h2>
-          <div className="controls">
-            <label>
-              <span>Probe</span>
-              <select value={selectedProbe} onChange={(event) => setSelectedProbe(event.target.value)}>
-                <option value="">Select a probe</option>
-                {probes.map((probe) => (
-                  <option key={probe.name} value={probe.name}>
-                    {probe.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="controls">
-              <button type="button" onClick={() => triggerProbe(selectedProbe)} disabled={!selectedProbe}>
-                Trigger probe
-              </button>
-              <span className="status-message">{statusMessage.probe}</span>
-            </div>
-          </div>
-          <pre>{probeResults}</pre>
-        </section>
-
-        <section className="panel" aria-live="polite">
-          <h2>Story details</h2>
-          <div className="controls">
-            <label>
-              <span>Story</span>
-              <select value={selectedStory} onChange={(event) => setSelectedStory(event.target.value)}>
-                <option value="">Select a story</option>
-                {stories.map((story) => (
-                  <option key={story.name} value={story.name}>
-                    {story.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="controls">
-              <button type="button" onClick={() => triggerStory(selectedStory)} disabled={!selectedStory}>
-                Trigger story
-              </button>
-              <span className="status-message">{statusMessage.story}</span>
-            </div>
-          </div>
-          <pre>{storyResults}</pre>
-        </section>
-
-        <section className="panel">
-          <h2>Configuration editor</h2>
-          <div className="controls">
-            <button type="button" onClick={saveConfig}>
-              Save config
-            </button>
-            <span className="status-message">{statusMessage.config}</span>
-          </div>
-          <textarea
-            value={configContent}
-            onChange={(event) => setConfigContent(event.target.value)}
-            spellCheck={false}
-            placeholder="Load config via the button above and edit..."
-          />
-        </section>
-
-        <section className="panel restart-panel">
-          <h2>Restart monitoring</h2>
-          <p>Requires <code>XBP_RESTART_CMD</code> to be defined in the environment.</p>
-          <button type="button" className="secondary" onClick={restartServer}>
-            Restart server
-          </button>
-          <span className="status-message">{statusMessage.restart}</span>
-        </section>
-      </main>
-      <footer>
-        <p>Changes take effect after the process restarts.</p>
-      </footer>
-    </>
+      {/* Results drawer (shared) */}
+      <ResultsDrawer
+        probeName={resultsProbe}
+        onClose={() => setResultsProbe(null)}
+      />
+    </div>
   );
 }

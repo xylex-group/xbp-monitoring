@@ -2,7 +2,9 @@
 const nextConfig = {
   output: "export",
   basePath: "/dashboard",
-  assetPrefix: "/dashboard"
+  assetPrefix: "/dashboard",
+  trailingSlash: true,
+  images: { unoptimized: true },
 };
 
 export default nextConfig;
