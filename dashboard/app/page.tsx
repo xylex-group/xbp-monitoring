@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Chip, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
-import { listProbeStatuses, getProbeResults } from "@/lib/api";
-import type { ProbeResult, ProbeStatus } from "@/lib/types";
+import { listProbeStatuses, getProbeResults, listProbes } from "@/lib/api";
+import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
 
@@ -15,21 +15,6 @@ const STATUS_ICON = {
   PENDING: "gravity-ui:circle-dashed",
 } as const;
 
-const SAMPLE_LOCATIONS = [
-  "Hong Kong",
-  "Sydney",
-  "Stockholm",
-  "Milan",
-  "Sao Paulo",
-  "Montreal",
-  "Oregon",
-  "Ohio",
-  "N. Virginia",
-  "London",
-  "Frankfurt",
-  "Mumbai",
-];
-
 interface RecentResult {
   probeName: string;
   result: ProbeResult;
@@ -37,8 +22,7 @@ interface RecentResult {
 
 interface RunResultItem {
   probeName: string;
-  location: string;
-  latencySeconds: number;
+  endpoint: string;
   status: ProbeStatus["status"];
   timeLabel: string;
 }
@@ -64,11 +48,6 @@ const STATUS_STYLES = {
   },
 };
 
-function seededLatency(name: string, offset = 0): number {
-  const seed = [...name].reduce((acc, ch) => acc + ch.charCodeAt(0), 0) + offset * 29;
-  return Number((1.5 + (seed % 460) / 100).toFixed(2));
-}
-
 function relativeTimeLabel(value: string | null): string {
   if (!value) return "never";
   const parsed = new Date(value);
@@ -88,6 +67,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [statuses, setStatuses] = useState<ProbeStatus[]>([]);
+  const [probes, setProbes] = useState<Probe[]>([]);
   const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [resultsProbe, setResultsProbe] = useState<string | null>(null);
@@ -104,8 +84,12 @@ export default function DashboardPage() {
     lastLoadAtRef.current = now;
 
     try {
-      const probeStatuses = await listProbeStatuses();
+      const [probeStatuses, probeList] = await Promise.all([
+        listProbeStatuses(),
+        listProbes(),
+      ]);
       setStatuses(probeStatuses);
+      setProbes(probeList);
 
       // Fetch last result for each failing probe (up to 5)
       const failing = probeStatuses
@@ -152,42 +136,20 @@ export default function DashboardPage() {
   const healthPct =
     stats.total > 0 ? Math.round((stats.ok / stats.total) * 100) : 100;
 
-  const syntheticTimeline = useMemo(() => {
-    return Array.from({ length: 30 }, (_, i) => {
-      const failSkew = stats.total === 0 ? 0 : Math.min(7, stats.failing + ((i * 7) % 3));
-      const passHeight = Math.max(4, 12 - failSkew);
-      const failHeight = Math.max(0, Math.min(8, failSkew));
-      return {
-        id: i,
-        passHeight,
-        failHeight,
-      };
-    });
-  }, [stats.failing, stats.total]);
+  const probeByName = useMemo(
+    () => Object.fromEntries(probes.map((probe) => [probe.name, probe])),
+    [probes]
+  );
 
   const runResults = useMemo<RunResultItem[]>(() => {
-    return statuses.slice(0, 12).map((status, index) => ({
+    return statuses.slice(0, 12).map((status) => ({
       probeName: status.name,
-      location: SAMPLE_LOCATIONS[index % SAMPLE_LOCATIONS.length],
-      latencySeconds: seededLatency(status.name, index),
+      endpoint: probeByName[status.name]?.url ?? "Unknown endpoint",
       status: status.status,
       timeLabel: relativeTimeLabel(status.last_probed),
     }));
-  }, [statuses]);
+  }, [statuses, probeByName]);
 
-  const latencies = runResults.map((item) => item.latencySeconds);
-  const p50 =
-    latencies.length > 0
-      ? latencies[Math.floor((latencies.length - 1) * 0.5)] ?? latencies[0]
-      : 0;
-  const p95 =
-    latencies.length > 0
-      ? latencies[Math.floor((latencies.length - 1) * 0.95)] ?? latencies[latencies.length - 1]
-      : 0;
-
-  const retries =
-    stats.total > 0 ? Number(((stats.failing / stats.total) * 2.6).toFixed(1)) : 0;
-  const failureAlerts = Math.max(0, stats.failing * 27);
   const errorMessage = recentResults[0]?.result.error_message ?? "No recent grouped errors";
   const primaryErrorProbe = recentResults[0]?.probeName ?? null;
 
@@ -261,35 +223,32 @@ export default function DashboardPage() {
               {
                 label: "Availability",
                 value: `${healthPct.toFixed(2)}%`,
-                delta: `${stats.ok >= stats.failing ? "+" : ""}${Math.max(
-                  0,
-                  stats.ok - stats.failing
-                ).toFixed(1)}%`,
+                delta: `${stats.ok}/${Math.max(1, stats.total)} healthy`,
               },
               {
-                label: "Retries",
-                value: retries,
-                delta: stats.failing > 0 ? `+${stats.failing}` : "0",
+                label: "Monitors",
+                value: stats.total,
+                delta: "Configured",
               },
               {
-                label: "P50",
-                value: `${p50.toFixed(2)} s`,
-                delta: "-8.2%",
+                label: "Healthy",
+                value: stats.ok,
+                delta: "Passing",
               },
               {
-                label: "P95",
-                value: `${p95.toFixed(2)} s`,
-                delta: "-7.4%",
+                label: "Failing",
+                value: stats.failing,
+                delta: "Needs attention",
               },
               {
-                label: "Failure Alerts",
-                value: failureAlerts,
-                delta: stats.failing > 0 ? `+${stats.failing * 2}` : "0",
+                label: "Pending",
+                value: stats.pending,
+                delta: "Waiting first run",
               },
               {
-                label: "Span Errors",
+                label: "Recent Alerts",
                 value: recentResults.length,
-                delta: "0%",
+                delta: "Last polling window",
               },
             ].map(({ label, value, delta }) => (
               <div
@@ -298,7 +257,7 @@ export default function DashboardPage() {
               >
                 <p className="text-xs font-medium text-default-500">{label}</p>
                 <p className="mt-1 text-2xl font-bold leading-none text-default-900 tabular-nums">{value}</p>
-                <p className="mt-1 text-xs text-success">{delta}</p>
+                <p className="mt-1 text-xs text-default-500">{delta}</p>
               </div>
             ))}
           </div>
@@ -306,22 +265,25 @@ export default function DashboardPage() {
           <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-default-900">Passing history</h2>
-                <p className="text-xs text-default-500">Daily pass/fail distribution over the selected window</p>
+                <h2 className="text-sm font-semibold text-default-900">Current monitor status</h2>
+                <p className="text-xs text-default-500">Live endpoint status from configured probes</p>
               </div>
-              <span className="text-xs text-default-500">Last 30 days</span>
+              <span className="text-xs text-default-500">{runResults.length} showing</span>
             </div>
-            <div className="flex h-36 items-end gap-1.5 rounded-lg bg-default-50 px-2 pb-2 pt-4">
-              {syntheticTimeline.map((bar) => (
-                <div key={bar.id} className="flex h-full flex-1 flex-col justify-end gap-0.5">
-                  <div
-                    className="w-full rounded-sm bg-danger"
-                    style={{ height: `${Math.max(0, bar.failHeight * 5)}%` }}
-                  />
-                  <div
-                    className="w-full rounded-sm bg-success"
-                    style={{ height: `${Math.max(18, bar.passHeight * 5)}%` }}
-                  />
+            <div className="space-y-2">
+              {runResults.slice(0, 8).map((item) => (
+                <div
+                  key={`${item.probeName}-${item.endpoint}`}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-default-100 px-3 py-2"
+                >
+                  <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
+                    <p className="truncate text-xs text-default-500">{item.endpoint}</p>
+                  </div>
+                  <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                    {item.status}
+                  </Chip>
                 </div>
               ))}
             </div>
@@ -392,13 +354,15 @@ export default function DashboardPage() {
 
             <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
               <div className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-900">Locations</h3>
+                <h3 className="text-sm font-semibold text-default-900">Endpoints</h3>
               </div>
               <div className="divide-y divide-default-100">
                 {runResults.slice(0, 5).map((item) => (
-                  <div key={`${item.probeName}-${item.location}`} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-4 py-2.5 text-sm">
-                    <span className="font-medium text-default-800">{item.location}</span>
-                    <span className="text-default-600">{item.latencySeconds.toFixed(2)} s</span>
+                  <div key={`${item.probeName}-${item.endpoint}`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-default-800">{item.probeName}</p>
+                      <p className="truncate text-xs text-default-500">{item.endpoint}</p>
+                    </div>
                     <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
                       {item.status}
                     </Chip>
@@ -419,7 +383,7 @@ export default function DashboardPage() {
           {runResults.length > 0 ? (
             runResults.map((item) => (
               <button
-                key={`${item.probeName}-${item.location}`}
+                key={`${item.probeName}-${item.endpoint}`}
                 type="button"
                 className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-default-50"
                 onClick={() => setResultsProbe(item.probeName)}
@@ -427,14 +391,14 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
-                    <p className="truncate text-sm font-medium text-default-900">{item.location}</p>
+                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-default-500">{item.probeName}</p>
+                  <p className="mt-0.5 truncate text-xs text-default-500">{item.endpoint}</p>
                   <p className="mt-1 text-xs text-default-400">{item.timeLabel}</p>
                 </div>
-                <span className="shrink-0 text-sm font-semibold tabular-nums text-default-700">
-                  {item.latencySeconds.toFixed(2)} s
-                </span>
+                <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                  {item.status}
+                </Chip>
               </button>
             ))
           ) : (

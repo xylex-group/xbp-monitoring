@@ -150,7 +150,7 @@ export default function MonitorsPage() {
                           type="button"
                           className="hover:underline"
                           onClick={() =>
-                            router.push(`/monitors/${encodeURIComponent(probe.name)}`)
+                            router.push(`/monitors/detail?name=${encodeURIComponent(probe.name)}`)
                           }
                         >
                           {probe.name}
@@ -190,7 +190,7 @@ export default function MonitorsPage() {
                             size="sm"
                             variant="ghost"
                             onPress={() =>
-                              router.push(`/monitors/${encodeURIComponent(probe.name)}`)
+                              router.push(`/monitors/detail?name=${encodeURIComponent(probe.name)}`)
                             }
                           >
                             <Icon icon="gravity-ui:eye" className="size-4" />

@@ -15,7 +15,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-screen bg-default-100 text-foreground antialiased">
         <ToastProvider>
           <Sidebar />
-          <main className="ml-60 min-h-screen p-5 lg:p-6">
+          <main className="min-h-screen p-4 pt-16 sm:p-5 sm:pt-16 lg:ml-60 lg:p-6 lg:pt-6">
             <BackendStatusBanner />
             {children}
           </main>

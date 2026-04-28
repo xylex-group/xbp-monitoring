@@ -98,7 +98,7 @@ export default function StoriesPage() {
                           size="sm"
                           variant="ghost"
                           onPress={() =>
-                            router.push(`/stories/${encodeURIComponent(story.name)}`)
+                            router.push(`/stories/detail?name=${encodeURIComponent(story.name)}`)
                           }
                         >
                           <Icon icon="gravity-ui:eye" className="size-4" />
