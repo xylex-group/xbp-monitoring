@@ -1,15 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Chip, Spinner, Table } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { listStories, triggerStory } from "@/lib/api";
+import type { StoryStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
-
-interface StorySummary {
-  name: string;
-  status: string;
-  last_probed: string | null;
-}
 
 const STATUS_COLOR = {
   OK: "success",
@@ -18,16 +15,15 @@ const STATUS_COLOR = {
 } as const;
 
 export default function StoriesPage() {
+  const router = useRouter();
   const { toast } = useToast();
-  const [stories, setStories] = useState<StorySummary[]>([]);
+  const [stories, setStories] = useState<StoryStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/stories");
-      if (!res.ok) throw new Error(await res.text());
-      setStories(await res.json());
+      setStories(await listStories());
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {
@@ -44,7 +40,7 @@ export default function StoriesPage() {
   async function handleTrigger(name: string) {
     setTriggering(name);
     try {
-      await fetch(`/api/stories/${encodeURIComponent(name)}/trigger`);
+      await triggerStory(name);
       toast(`"${name}" triggered`, { variant: "success" });
       setTimeout(load, 2000);
     } catch (err) {
@@ -96,7 +92,17 @@ export default function StoriesPage() {
                         : "Never"}
                     </Table.Cell>
                     <Table.Cell>
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="ghost"
+                          onPress={() =>
+                            router.push(`/stories/${encodeURIComponent(story.name)}`)
+                          }
+                        >
+                          <Icon icon="gravity-ui:eye" className="size-4" />
+                        </Button>
                         <Button
                           isIconOnly
                           size="sm"

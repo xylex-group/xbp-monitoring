@@ -3,6 +3,8 @@ import type {
   Probe,
   ProbeResult,
   ProbeStatus,
+  StoryResult,
+  StoryStatus,
   TriggerResponse,
 } from "./types";
 
@@ -84,6 +86,24 @@ export function getProbeResults(name: string): Promise<ProbeResult[]> {
 export function triggerProbe(name: string): Promise<TriggerResponse> {
   return request<TriggerResponse>(
     `/api/probes/${encodeURIComponent(name)}/trigger`
+  );
+}
+
+// ── Stories status overview ──────────────────────────────────────────────────
+
+export function listStories(): Promise<StoryStatus[]> {
+  return request<StoryStatus[]>("/api/stories");
+}
+
+export function getStoryResults(name: string): Promise<StoryResult[]> {
+  return request<StoryResult[]>(
+    `/api/stories/${encodeURIComponent(name)}/results?show_response=true`
+  );
+}
+
+export function triggerStory(name: string): Promise<StoryResult> {
+  return request<StoryResult>(
+    `/api/stories/${encodeURIComponent(name)}/trigger`
   );
 }
 

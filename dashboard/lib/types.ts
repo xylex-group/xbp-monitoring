@@ -66,5 +66,48 @@ export interface TriggerResponse {
 
 export interface ApiConfig {
   probes: Probe[];
-  stories: unknown[];
+  stories: Story[];
+}
+
+export interface Story {
+  name: string;
+  steps: Array<{
+    name: string;
+    url: string;
+    http_method: string;
+    with?: ProbeInputParameters;
+    expectations?: ProbeExpectation[];
+    sensitive?: boolean;
+  }>;
+  schedule: ProbeSchedule;
+  alerts?: ProbeAlert[];
+  tags?: Record<string, string>;
+}
+
+export interface StoryStatus {
+  name: string;
+  status: "OK" | "FAILING" | "PENDING";
+  last_probed: string | null;
+}
+
+export interface StoryStepResult {
+  step_name: string;
+  timestamp_started: string;
+  success: boolean;
+  error_message?: string;
+  trace_id?: string;
+  span_id?: string;
+  response?: {
+    timestamp_received: string;
+    status_code: number;
+    body: string;
+    sensitive: boolean;
+  };
+}
+
+export interface StoryResult {
+  story_name: string;
+  timestamp_started: string;
+  success: boolean;
+  step_results: StoryStepResult[];
 }

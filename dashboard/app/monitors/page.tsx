@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Button,
   Chip,
@@ -22,6 +23,7 @@ const STATUS_COLOR = {
 } as const;
 
 export default function MonitorsPage() {
+  const router = useRouter();
   const { toast } = useToast();
   const [probes, setProbes] = useState<Probe[]>([]);
   const [statuses, setStatuses] = useState<Record<string, ProbeStatus>>({});
@@ -143,7 +145,17 @@ export default function MonitorsPage() {
                   const status = statuses[probe.name];
                   return (
                     <Table.Row key={probe.name} id={probe.name}>
-                      <Table.Cell className="font-medium">{probe.name}</Table.Cell>
+                      <Table.Cell className="font-medium">
+                        <button
+                          type="button"
+                          className="hover:underline"
+                          onClick={() =>
+                            router.push(`/monitors/${encodeURIComponent(probe.name)}`)
+                          }
+                        >
+                          {probe.name}
+                        </button>
+                      </Table.Cell>
                       <Table.Cell>
                         <span className="text-xs text-muted font-mono truncate max-w-48 block">
                           {probe.url}
@@ -177,7 +189,9 @@ export default function MonitorsPage() {
                             isIconOnly
                             size="sm"
                             variant="ghost"
-                            onPress={() => setResultsProbe(probe.name)}
+                            onPress={() =>
+                              router.push(`/monitors/${encodeURIComponent(probe.name)}`)
+                            }
                           >
                             <Icon icon="gravity-ui:eye" className="size-4" />
                           </Button>
