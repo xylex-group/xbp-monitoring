@@ -29,6 +29,7 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
     let otel_state: otel::OtelGuard = otel::init();
+    let prometheus_registry = otel_state.metrics.registry.clone();
     if let Some(registry) = &otel_state.metrics.registry {
         tokio::spawn(start_prometheus_server(registry.clone()));
     }
@@ -36,7 +37,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config_path = PathBuf::from(&args.file);
     let config: config::Config = load_config(config_path.clone()).await?;
 
-    let app_state: Arc<AppState> = Arc::new(AppState::new(config, config_path));
+    let app_state: Arc<AppState> =
+        Arc::new(AppState::new(config, config_path, prometheus_registry));
 
     start_monitoring(app_state.clone()).await?;
 

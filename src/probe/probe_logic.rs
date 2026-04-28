@@ -388,6 +388,7 @@ mod probe_logic_tests {
                 stories: vec![],
             },
             PathBuf::from("xbp.yml"),
+            None,
         ));
 
         Mock::given(method("GET"))
@@ -455,6 +456,7 @@ mod probe_logic_tests {
                 stories: vec![],
             },
             PathBuf::from("xbp.yml"),
+            None,
         ));
 
         Mock::given(method("GET"))
@@ -539,6 +541,7 @@ mod probe_logic_tests {
                 stories: vec![],
             },
             PathBuf::from("xbp.yml"),
+            None,
         ));
 
         Mock::given(method("GET"))

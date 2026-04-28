@@ -102,7 +102,7 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml")));
+        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml"), None));
 
         schedule_probes(&app_state.config.probes, app_state.clone());
 
@@ -137,7 +137,7 @@ mod schedule_tests {
             stories: vec![],
         };
 
-        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml")));
+        let app_state = Arc::new(AppState::new(config, PathBuf::from("xbp.yml"), None));
 
         schedule_probes(&app_state.config.probes, app_state.clone());
 

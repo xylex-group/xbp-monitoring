@@ -4,12 +4,14 @@ mod probes;
 mod prometheus_metrics;
 mod restart;
 mod stories;
+mod telemetry;
 
 use crate::web_server::{
     config_api::{get_config, put_config},
     probes::{get_probe_results, probe_trigger, probes},
     restart::restart,
     stories::{get_story_results, stories, story_trigger},
+    telemetry::telemetry_status,
 };
 use axum::{
     routing::{get, post},
@@ -34,6 +36,11 @@ pub async fn start_axum_server(app_state: Arc<AppState>) {
         .route("/stories", get(stories))
         .route("/stories/:name/results", get(get_story_results))
         .route("/stories/:name/trigger", get(story_trigger))
+        .route(
+            "/metrics",
+            get(prometheus_metrics::metrics_from_app_state_handler),
+        )
+        .route("/api/telemetry", get(telemetry_status))
         .route("/api/config", get(get_config).put(put_config))
         .route("/api/restart", post(restart))
         .layer(Extension(app_state.clone()));

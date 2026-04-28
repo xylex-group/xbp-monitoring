@@ -3,6 +3,7 @@ use std::{env, time::Duration};
 use metrics::MetricsState;
 use opentelemetry_otlp::{ExportConfig, Protocol};
 use opentelemetry_sdk::resource::Resource;
+use tracing_subscriber::layer::Layered;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::EnvFilter;
 
@@ -26,13 +27,27 @@ impl Drop for OtelGuard {
 }
 
 pub fn init() -> OtelGuard {
-    let metrics_state = metrics::initialize();
+    let metrics_state: MetricsState = metrics::initialize();
     tracing::create_tracer();
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::registry()
-        .with(filter)
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    let filter: EnvFilter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+    let fmt_layer: tracing_subscriber::fmt::Layer<
+        Layered<EnvFilter, tracing_subscriber::Registry>,
+    > = tracing_subscriber::fmt::layer();
+
+    if let Some((loki_layer, loki_task)) = tracing::loki_from_env() {
+        tokio::spawn(loki_task);
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt_layer)
+            .with(loki_layer)
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt_layer)
+            .init();
+    }
 
     OtelGuard {
         metrics: metrics_state,

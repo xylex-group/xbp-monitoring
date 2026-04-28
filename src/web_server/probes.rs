@@ -21,10 +21,7 @@ pub async fn get_probe_results(
 
     let show_response = params.show_response.unwrap_or(false);
     let read_lock = state.probe_results.read().unwrap();
-    let mut cloned_results: Vec<ProbeResult> = read_lock
-        .get(&name)
-        .map(|results| results.clone())
-        .unwrap_or_default();
+    let mut cloned_results: Vec<ProbeResult> = read_lock.get(&name).cloned().unwrap_or_default();
     cloned_results.reverse();
 
     if !show_response {

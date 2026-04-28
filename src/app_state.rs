@@ -16,16 +16,22 @@ pub struct AppState {
     pub config: Config,
     pub config_path: PathBuf,
     pub metrics: Metrics,
+    pub prometheus_registry: Option<std::sync::Arc<prometheus::Registry>>,
 }
 
 impl AppState {
-    pub fn new(config: Config, config_path: PathBuf) -> AppState {
+    pub fn new(
+        config: Config,
+        config_path: PathBuf,
+        prometheus_registry: Option<std::sync::Arc<prometheus::Registry>>,
+    ) -> AppState {
         AppState {
             probe_results: RwLock::new(HashMap::new()),
             story_results: RwLock::new(HashMap::new()),
             config,
             config_path,
             metrics: Metrics::new(),
+            prometheus_registry,
         }
     }
 

@@ -10,7 +10,9 @@ use tracing::{error, info};
 use crate::errors::MapToSendError;
 use crate::probe::model::ProbeAlert;
 
+#[allow(dead_code)]
 const REQUEST_TIMEOUT_SECS: u64 = 30;
+#[allow(dead_code)]
 const CONTENT_TYPE: &str = "application/json";
 
 lazy_static! {
@@ -20,6 +22,7 @@ lazy_static! {
         .expect("Failed to build reqwest client");
 }
 
+#[allow(dead_code)]
 pub async fn send_alert_discord(
     alert: &ProbeAlert,
     probe_name: String,
