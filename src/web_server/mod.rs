@@ -17,13 +17,21 @@ use axum::{
     routing::{get, post},
     Extension, Router,
 };
-use std::{env, sync::Arc};
+use std::{
+    env,
+    io::{ErrorKind, Result as IoResult},
+    sync::Arc,
+};
 use tower_http::services::ServeDir;
-use tracing::{debug, info};
+use tracing::{debug, error, info, warn};
 
 use crate::app_state::AppState;
 
-pub async fn start_axum_server(app_state: Arc<AppState>) {
+fn ansi(code: &str, text: &str) -> String {
+    format!("\x1b[{code}m{text}\x1b[0m")
+}
+
+pub async fn start_axum_server(app_state: Arc<AppState>) -> IoResult<()> {
     let app = Router::new()
         .route("/", get(root))
         .nest_service(
@@ -45,11 +53,25 @@ pub async fn start_axum_server(app_state: Arc<AppState>) {
         .route("/api/restart", post(restart))
         .layer(Extension(app_state.clone()));
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
+        Ok(listener) => listener,
+        Err(err) if err.kind() == ErrorKind::AddrInUse => {
+            error!("API port 3000 already in use: {}", err);
+            eprintln!(
+                "{} Could not bind API server to 0.0.0.0:3000 (address already in use).\n  Hint: stop the old process OR run only one backend instance.\n  Dashboard dev should run on :3001 and proxy to backend on :3000.",
+                ansi("1;31", "[XBP startup error]"),
+            );
+            return Err(err);
+        }
+        Err(err) => {
+            error!("Failed to bind API server: {}", err);
+            return Err(err);
+        }
+    };
 
     info!("listening on {}", listener.local_addr().unwrap());
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app).await
 }
 
 pub async fn start_prometheus_server(registry: Arc<prometheus::Registry>) {
@@ -65,16 +87,30 @@ pub async fn start_prometheus_server(registry: Arc<prometheus::Registry>) {
         .route("/metrics", get(prometheus_metrics::metrics_handler))
         .layer(Extension(registry));
 
-    let listener = tokio::net::TcpListener::bind(format!("{}:{}", host, port))
-        .await
-        .unwrap();
+    let listener = match tokio::net::TcpListener::bind(format!("{}:{}", host, port)).await {
+        Ok(listener) => listener,
+        Err(err) if err.kind() == ErrorKind::AddrInUse => {
+            warn!("Prometheus listener address already in use: {}", err);
+            eprintln!(
+                "{} Prometheus dedicated listener could not start (address in use).\n  Main API /metrics endpoint remains available when OTEL_METRICS_EXPORTER=prometheus.",
+                ansi("1;33", "[XBP warning]"),
+            );
+            return;
+        }
+        Err(err) => {
+            warn!("Failed to start Prometheus listener: {}", err);
+            return;
+        }
+    };
 
     info!(
         "Serving Prometheus metrics on {}/metrics",
         listener.local_addr().unwrap()
     );
 
-    axum::serve(listener, app).await.unwrap();
+    if let Err(err) = axum::serve(listener, app).await {
+        warn!("Prometheus server stopped with error: {}", err);
+    }
 }
 
 async fn root() -> &'static str {

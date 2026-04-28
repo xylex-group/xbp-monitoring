@@ -55,9 +55,11 @@ function relativeTimeLabel(value: string | null): string {
   const diffMs = Date.now() - parsed.getTime();
   if (diffMs < 60_000) return "just now";
   const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+  if (diffMins < 60)
+    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
   const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `about ${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  if (diffHours < 24)
+    return `about ${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
@@ -75,48 +77,51 @@ export default function DashboardPage() {
   const loadingRef = useRef(false);
   const lastLoadAtRef = useRef(0);
 
-  const load = useCallback(async (force = false) => {
-    const now = Date.now();
-    if (loadingRef.current) return;
-    if (!force && now - lastLoadAtRef.current < LOAD_MIN_INTERVAL_MS) return;
+  const load = useCallback(
+    async (force = false) => {
+      const now = Date.now();
+      if (loadingRef.current) return;
+      if (!force && now - lastLoadAtRef.current < LOAD_MIN_INTERVAL_MS) return;
 
-    loadingRef.current = true;
-    lastLoadAtRef.current = now;
+      loadingRef.current = true;
+      lastLoadAtRef.current = now;
 
-    try {
-      const [probeStatuses, probeList] = await Promise.all([
-        listProbeStatuses(),
-        listProbes(),
-      ]);
-      setStatuses(probeStatuses);
-      setProbes(probeList);
+      try {
+        const [probeStatuses, probeList] = await Promise.all([
+          listProbeStatuses(),
+          listProbes(),
+        ]);
+        setStatuses(probeStatuses);
+        setProbes(probeList);
 
-      // Fetch last result for each failing probe (up to 5)
-      const failing = probeStatuses
-        .filter((s) => s.status === "FAILING")
-        .slice(0, 5);
+        // Fetch last result for each failing probe (up to 5)
+        const failing = probeStatuses
+          .filter((s) => s.status === "FAILING")
+          .slice(0, 5);
 
-      const recent: RecentResult[] = [];
-      for (const s of failing) {
-        try {
-          const results = await getProbeResults(s.name);
-          if (results[0]) {
-            recent.push({ probeName: s.name, result: results[0] });
+        const recent: RecentResult[] = [];
+        for (const s of failing) {
+          try {
+            const results = await getProbeResults(s.name);
+            if (results[0]) {
+              recent.push({ probeName: s.name, result: results[0] });
+            }
+          } catch {
+            // Keep dashboard responsive even when one probe result request fails.
           }
-        } catch {
-          // Keep dashboard responsive even when one probe result request fails.
         }
-      }
 
-      setRecentResults(recent);
-      setLastUpdated(new Date());
-    } catch (err) {
-      toast(String(err), { variant: "danger" });
-    } finally {
-      loadingRef.current = false;
-      setLoading(false);
-    }
-  }, [toast]);
+        setRecentResults(recent);
+        setLastUpdated(new Date());
+      } catch (err) {
+        toast(String(err), { variant: "danger" });
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
+      }
+    },
+    [toast],
+  );
 
   useEffect(() => {
     load(true);
@@ -138,7 +143,7 @@ export default function DashboardPage() {
 
   const probeByName = useMemo(
     () => Object.fromEntries(probes.map((probe) => [probe.name, probe])),
-    [probes]
+    [probes],
   );
 
   const runResults = useMemo<RunResultItem[]>(() => {
@@ -150,7 +155,8 @@ export default function DashboardPage() {
     }));
   }, [statuses, probeByName]);
 
-  const errorMessage = recentResults[0]?.result.error_message ?? "No recent grouped errors";
+  const errorMessage =
+    recentResults[0]?.result.error_message ?? "No recent grouped errors";
   const primaryErrorProbe = recentResults[0]?.probeName ?? null;
 
   return (
@@ -159,12 +165,9 @@ export default function DashboardPage() {
         <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="mb-1 flex items-center gap-2 text-xs text-default-500">
-                <span>AI Analysis Demo Account</span>
-                <span>/</span>
-                <span className="font-semibold text-default-700">OTEL test app</span>
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight text-default-900">OTEL test app</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-default-900">
+                Synthetic monitoring
+              </h1>
               <div className="mt-2 flex items-center gap-2">
                 <Chip size="sm" color="success" variant="soft">
                   Check is passing
@@ -190,194 +193,257 @@ export default function DashboardPage() {
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {["Custom", "Today", "1hr", "3hr", "24hr", "7d", "30d"].map((item) => (
-              <button
-                key={item}
-                className="rounded-md border border-default-200 bg-default-50 px-2.5 py-1 text-xs font-medium text-default-600"
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-            <div className="ml-1 h-4 w-px bg-default-200" />
-            {["Passed", "Failed", "Degraded", "Has retries", "Location"].map((item) => (
-              <button
-                key={item}
-                className="rounded-md border border-default-200 bg-white px-2.5 py-1 text-xs font-medium text-default-700"
-                type="button"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </div>
-
-      {loading ? (
-        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
-          <Spinner size="lg" />
-        </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-            {[
-              {
-                label: "Availability",
-                value: `${healthPct.toFixed(2)}%`,
-                delta: `${stats.ok}/${Math.max(1, stats.total)} healthy`,
-              },
-              {
-                label: "Monitors",
-                value: stats.total,
-                delta: "Configured",
-              },
-              {
-                label: "Healthy",
-                value: stats.ok,
-                delta: "Passing",
-              },
-              {
-                label: "Failing",
-                value: stats.failing,
-                delta: "Needs attention",
-              },
-              {
-                label: "Pending",
-                value: stats.pending,
-                delta: "Waiting first run",
-              },
-              {
-                label: "Recent Alerts",
-                value: recentResults.length,
-                delta: "Last polling window",
-              },
-            ].map(({ label, value, delta }) => (
-              <div
-                key={label}
-                className="rounded-xl border border-default-200 bg-white p-3.5 shadow-sm"
-              >
-                <p className="text-xs font-medium text-default-500">{label}</p>
-                <p className="mt-1 text-2xl font-bold leading-none text-default-900 tabular-nums">{value}</p>
-                <p className="mt-1 text-xs text-default-500">{delta}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-default-900">Current monitor status</h2>
-                <p className="text-xs text-default-500">Live endpoint status from configured probes</p>
-              </div>
-              <span className="text-xs text-default-500">{runResults.length} showing</span>
-            </div>
-            <div className="space-y-2">
-              {runResults.slice(0, 8).map((item) => (
-                <div
-                  key={`${item.probeName}-${item.endpoint}`}
-                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-default-100 px-3 py-2"
+            {["Custom", "Today", "1hr", "3hr", "24hr", "7d", "30d"].map(
+              (item) => (
+                <button
+                  key={item}
+                  className="rounded-md border border-default-200 bg-default-50 px-2.5 py-1 text-xs font-medium text-default-600"
+                  type="button"
                 >
-                  <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
-                    <p className="truncate text-xs text-default-500">{item.endpoint}</p>
-                  </div>
-                  <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
-                    {item.status}
-                  </Chip>
+                  {item}
+                </button>
+              ),
+            )}
+            <div className="ml-1 h-4 w-px bg-default-200" />
+            {["Passed", "Failed", "Degraded", "Has retries", "Location"].map(
+              (item) => (
+                <button
+                  key={item}
+                  className="rounded-md border border-default-200 bg-white px-2.5 py-1 text-xs font-medium text-default-700"
+                  type="button"
+                >
+                  {item}
+                </button>
+              ),
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+              {[
+                {
+                  label: "Availability",
+                  value: `${healthPct.toFixed(2)}%`,
+                  delta: `${stats.ok}/${Math.max(1, stats.total)} healthy`,
+                },
+                {
+                  label: "Monitors",
+                  value: stats.total,
+                  delta: "Configured",
+                },
+                {
+                  label: "Healthy",
+                  value: stats.ok,
+                  delta: "Passing",
+                },
+                {
+                  label: "Failing",
+                  value: stats.failing,
+                  delta: "Needs attention",
+                },
+                {
+                  label: "Pending",
+                  value: stats.pending,
+                  delta: "Waiting first run",
+                },
+                {
+                  label: "Recent Alerts",
+                  value: recentResults.length,
+                  delta: "Last polling window",
+                },
+              ].map(({ label, value, delta }) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-default-200 bg-white p-3.5 shadow-sm"
+                >
+                  <p className="text-xs font-medium text-default-500">
+                    {label}
+                  </p>
+                  <p className="mt-1 text-2xl font-bold leading-none text-default-900 tabular-nums">
+                    {value}
+                  </p>
+                  <p className="mt-1 text-xs text-default-500">{delta}</p>
                 </div>
               ))}
             </div>
-          </div>
 
-          <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
-            <div className="border-b border-default-200 px-4 py-3">
-              <h2 className="text-sm font-semibold text-default-900">Error Groups</h2>
-            </div>
-            <div className="overflow-auto">
-              <table className="min-w-full text-sm">
-                <thead className="bg-default-50 text-xs uppercase tracking-wide text-default-500">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-semibold">Message</th>
-                    <th className="px-4 py-2 text-left font-semibold">First seen</th>
-                    <th className="px-4 py-2 text-left font-semibold">Last seen</th>
-                    <th className="px-4 py-2 text-left font-semibold">Events</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    className={`border-t border-default-100 ${primaryErrorProbe ? "cursor-pointer hover:bg-default-50" : ""}`}
-                    onClick={() => {
-                      if (!primaryErrorProbe) return;
-                      router.push(`/dashboard/events?probe=${encodeURIComponent(primaryErrorProbe)}`);
-                    }}
+            <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+              <div className="mb-4 flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-semibold text-default-900">
+                    Current monitor status
+                  </h2>
+                  <p className="text-xs text-default-500">
+                    Live endpoint status from configured probes
+                  </p>
+                </div>
+                <span className="text-xs text-default-500">
+                  {runResults.length} showing
+                </span>
+              </div>
+              <div className="space-y-2">
+                {runResults.slice(0, 8).map((item) => (
+                  <div
+                    key={`${item.probeName}-${item.endpoint}`}
+                    className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-default-100 px-3 py-2"
                   >
-                    <td className="max-w-[420px] truncate px-4 py-3 text-default-700">{errorMessage}</td>
-                    <td className="px-4 py-3 text-default-500">1m ago</td>
-                    <td className="px-4 py-3 text-default-500">3h ago</td>
-                    <td className="px-4 py-3 font-semibold text-default-800">{Math.max(1, recentResults.length * 53)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
-              <div className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-900">Alerts</h3>
-              </div>
-              <div className="divide-y divide-default-100">
-                {recentResults.length > 0 ? (
-                  recentResults.slice(0, 5).map(({ probeName, result }) => (
-                    <button
-                      key={probeName}
-                      className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-default-50"
-                      onClick={() =>
-                        router.push(`/dashboard/events?probe=${encodeURIComponent(probeName)}`)
-                      }
-                      type="button"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex size-2 rounded-full bg-danger" />
-                        <span className="text-sm font-medium text-default-800">{probeName}</span>
-                      </div>
-                      <span className="text-xs text-default-500">
-                        {relativeTimeLabel(result.timestamp_started)}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-6 text-sm text-default-500">No recent alerts 🎉</div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
-              <div className="border-b border-default-200 px-4 py-3">
-                <h3 className="text-sm font-semibold text-default-900">Endpoints</h3>
-              </div>
-              <div className="divide-y divide-default-100">
-                {runResults.slice(0, 5).map((item) => (
-                  <div key={`${item.probeName}-${item.endpoint}`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 text-sm">
+                    <span
+                      className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`}
+                    />
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-default-800">{item.probeName}</p>
-                      <p className="truncate text-xs text-default-500">{item.endpoint}</p>
+                      <p className="truncate text-sm font-medium text-default-900">
+                        {item.probeName}
+                      </p>
+                      <p className="truncate text-xs text-default-500">
+                        {item.endpoint}
+                      </p>
                     </div>
-                    <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                    <Chip
+                      size="sm"
+                      color={STATUS_STYLES[item.status].chipColor}
+                      variant="soft"
+                    >
                       {item.status}
                     </Chip>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        </>
-      )}
+
+            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+              <div className="border-b border-default-200 px-4 py-3">
+                <h2 className="text-sm font-semibold text-default-900">
+                  Error Groups
+                </h2>
+              </div>
+              <div className="overflow-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-default-50 text-xs uppercase tracking-wide text-default-500">
+                    <tr>
+                      <th className="px-4 py-2 text-left font-semibold">
+                        Message
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold">
+                        First seen
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold">
+                        Last seen
+                      </th>
+                      <th className="px-4 py-2 text-left font-semibold">
+                        Events
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      className={`border-t border-default-100 ${primaryErrorProbe ? "cursor-pointer hover:bg-default-50" : ""}`}
+                      onClick={() => {
+                        if (!primaryErrorProbe) return;
+                        router.push(
+                          `/dashboard/events?probe=${encodeURIComponent(primaryErrorProbe)}`,
+                        );
+                      }}
+                    >
+                      <td className="max-w-[420px] truncate px-4 py-3 text-default-700">
+                        {errorMessage}
+                      </td>
+                      <td className="px-4 py-3 text-default-500">1m ago</td>
+                      <td className="px-4 py-3 text-default-500">3h ago</td>
+                      <td className="px-4 py-3 font-semibold text-default-800">
+                        {Math.max(1, recentResults.length * 53)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+                <div className="border-b border-default-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-default-900">
+                    Alerts
+                  </h3>
+                </div>
+                <div className="divide-y divide-default-100">
+                  {recentResults.length > 0 ? (
+                    recentResults.slice(0, 5).map(({ probeName, result }) => (
+                      <button
+                        key={probeName}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-default-50"
+                        onClick={() =>
+                          router.push(
+                            `/dashboard/events?probe=${encodeURIComponent(probeName)}`,
+                          )
+                        }
+                        type="button"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex size-2 rounded-full bg-danger" />
+                          <span className="text-sm font-medium text-default-800">
+                            {probeName}
+                          </span>
+                        </div>
+                        <span className="text-xs text-default-500">
+                          {relativeTimeLabel(result.timestamp_started)}
+                        </span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-6 text-sm text-default-500">
+                      No recent alerts 🎉
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+                <div className="border-b border-default-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-default-900">
+                    Endpoints
+                  </h3>
+                </div>
+                <div className="divide-y divide-default-100">
+                  {runResults.slice(0, 5).map((item) => (
+                    <div
+                      key={`${item.probeName}-${item.endpoint}`}
+                      className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-default-800">
+                          {item.probeName}
+                        </p>
+                        <p className="truncate text-xs text-default-500">
+                          {item.endpoint}
+                        </p>
+                      </div>
+                      <Chip
+                        size="sm"
+                        color={STATUS_STYLES[item.status].chipColor}
+                        variant="soft"
+                      >
+                        {item.status}
+                      </Chip>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <aside className="h-fit rounded-2xl border border-default-200 bg-white shadow-sm xl:sticky xl:top-6">
         <div className="border-b border-default-200 px-4 py-3">
-          <h2 className="text-base font-semibold text-default-900">Run results</h2>
+          <h2 className="text-base font-semibold text-default-900">
+            Run results
+          </h2>
         </div>
         <div className="max-h-[72vh] divide-y divide-default-100 overflow-auto">
           {runResults.length > 0 ? (
@@ -390,19 +456,33 @@ export default function DashboardPage() {
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
-                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
+                    <span
+                      className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`}
+                    />
+                    <p className="truncate text-sm font-medium text-default-900">
+                      {item.probeName}
+                    </p>
                   </div>
-                  <p className="mt-0.5 truncate text-xs text-default-500">{item.endpoint}</p>
-                  <p className="mt-1 text-xs text-default-400">{item.timeLabel}</p>
+                  <p className="mt-0.5 truncate text-xs text-default-500">
+                    {item.endpoint}
+                  </p>
+                  <p className="mt-1 text-xs text-default-400">
+                    {item.timeLabel}
+                  </p>
                 </div>
-                <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                <Chip
+                  size="sm"
+                  color={STATUS_STYLES[item.status].chipColor}
+                  variant="soft"
+                >
                   {item.status}
                 </Chip>
               </button>
             ))
           ) : (
-            <div className="px-4 py-8 text-sm text-default-500">No run results yet.</div>
+            <div className="px-4 py-8 text-sm text-default-500">
+              No run results yet.
+            </div>
           )}
         </div>
       </aside>
