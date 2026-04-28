@@ -10,11 +10,11 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
-      <body className="bg-background text-foreground min-h-screen flex">
+    <html lang="en">
+      <body className="min-h-screen bg-default-100 text-foreground antialiased">
         <ToastProvider>
           <Sidebar />
-          <main className="flex-1 ml-64 p-6 overflow-auto">{children}</main>
+          <main className="ml-60 min-h-screen p-5 lg:p-6">{children}</main>
         </ToastProvider>
       </body>
     </html>
