@@ -153,6 +153,13 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 - Pressing the restart button sends a POST to `/api/restart` and executes the shell command in `XBP_RESTART_CMD`.
 - **Building the dashboard**: before running `cargo run`, go to the `dashboard/` directory, install dependencies (`npm install`), and run `npm run build`. That produces the static files in `dashboard/out/`, which the Rust server serves at `/dashboard`.
 
+### Dashboard local development (Next + Rust)
+
+- Rust backend serves API endpoints on `http://127.0.0.1:3000`.
+- Dashboard dev server runs on `http://127.0.0.1:3001/dashboard`.
+- Next rewrites proxy `/api/*`, `/probes/*`, and `/stories/*` from port `3001` to Rust on port `3000`.
+- Start backend first, then run dashboard dev in another terminal to avoid API 404 HTML responses.
+
 ## Config and YAML
 
 - Deserialize config with `serde_yaml`; top-level shape is `Config { probes, stories }`.

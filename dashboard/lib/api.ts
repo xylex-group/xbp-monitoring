@@ -6,21 +6,61 @@ import type {
   TriggerResponse,
 } from "./types";
 
-/** Base URL — empty string means same origin (Rust serves both API and static files) */
-const BASE = "";
+/**
+ * Base URL for API requests.
+ * - Production (Rust serves dashboard + API on same origin): empty string
+ * - Local Next dev: optionally set NEXT_PUBLIC_API_BASE_URL, e.g. http://127.0.0.1:3000
+ */
+const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+
+function isHtmlContent(contentType: string, body: string): boolean {
+  return contentType.includes("text/html") || /^\s*<!DOCTYPE html/i.test(body);
+}
+
+function shorten(text: string, max = 240): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function buildEndpoint(path: string): string {
+  return `${BASE}${path}`;
+}
 
 async function request<T>(
   path: string,
   init?: RequestInit
 ): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, init);
+  const endpoint = buildEndpoint(path);
+  const res = await fetch(endpoint, init);
+
+  const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
+
+    if (isHtmlContent(contentType, text)) {
+      throw new Error(
+        `API request failed for ${path} (HTTP ${res.status}). Received HTML instead of API data. ` +
+          `If you are running Next dev, start Rust backend on :3000 and dashboard on :3001.`
+      );
+    }
+
     throw new Error(text || `HTTP ${res.status}`);
   }
-  const contentType = res.headers.get("content-type") ?? "";
-  if (contentType.includes("application/json")) return res.json() as Promise<T>;
-  return res.text() as unknown as T;
+
+  const text = await res.text();
+
+  if (isHtmlContent(contentType, text)) {
+    throw new Error(
+      `Unexpected HTML response for ${path}. Check API base URL and backend availability. ` +
+        `Received: ${shorten(text)}`
+    );
+  }
+
+  if (contentType.includes("application/json")) {
+    return JSON.parse(text) as T;
+  }
+
+  return text as unknown as T;
 }
 
 // ── Probes status overview ────────────────────────────────────────────────────
@@ -53,12 +93,10 @@ export async function getFullConfig(): Promise<ApiConfig> {
 export async function saveFullConfig(config: ApiConfig): Promise<void> {
   const { dump } = await import("js-yaml");
   const yaml = dump(config, { lineWidth: 120 });
-  await fetch("/api/config", {
+  await request<string>("/api/config", {
     method: "PUT",
     headers: { "Content-Type": "text/yaml" },
     body: yaml,
-  }).then(async (res) => {
-    if (!res.ok) throw new Error(await res.text());
   });
 }
 
@@ -99,7 +137,5 @@ export async function deleteProbe(name: string): Promise<void> {
 }
 
 export async function restartServer(): Promise<void> {
-  await fetch("/api/restart", { method: "POST" }).then(async (res) => {
-    if (!res.ok) throw new Error(await res.text());
-  });
+  await request<string>("/api/restart", { method: "POST" });
 }
