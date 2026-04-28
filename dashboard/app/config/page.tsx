@@ -114,7 +114,7 @@ export default function ConfigPage() {
       </div>
 
       {mounted && (
-        <div className="rounded-xl border border-default-200 bg-white p-5 shadow-sm">
+        <div className="rounded-xl border border-default-200 bg-content1 p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-sm font-semibold text-default-900">API Settings</h2>
             <p className="text-xs text-default-500 mt-1">

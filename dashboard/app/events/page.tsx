@@ -50,7 +50,7 @@ function EventsPageContent() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="mb-1 flex items-center gap-2 text-xs text-default-500">
@@ -99,17 +99,17 @@ function EventsPageContent() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
+        <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
           <Spinner size="lg" />
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-2xl border border-default-200 bg-white p-8 text-center text-default-500 shadow-sm">
+        <div className="rounded-2xl border border-default-200 bg-content1 p-8 text-center text-default-500 shadow-sm">
           No events found for this probe.
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {results.map((result, idx) => (
-            <div key={`${result.timestamp_started}-${idx}`} className="rounded-xl border border-default-200 bg-white p-4 shadow-sm">
+            <div key={`${result.timestamp_started}-${idx}`} className="rounded-xl border border-default-200 bg-content1 p-4 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Chip size="sm" variant="soft" color={result.success ? "success" : "danger"}>
@@ -153,7 +153,7 @@ export default function EventsPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
+        <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
           <Spinner size="lg" />
         </div>
       }

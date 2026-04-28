@@ -162,7 +162,7 @@ export default function DashboardPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex flex-col gap-5">
-        <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-default-900">
@@ -209,7 +209,7 @@ export default function DashboardPage() {
               (item) => (
                 <button
                   key={item}
-                  className="rounded-md border border-default-200 bg-white px-2.5 py-1 text-xs font-medium text-default-700"
+                  className="rounded-md border border-default-200 bg-content1 px-2.5 py-1 text-xs font-medium text-default-700"
                   type="button"
                 >
                   {item}
@@ -220,7 +220,7 @@ export default function DashboardPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
+          <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
             <Spinner size="lg" />
           </div>
         ) : (
@@ -260,7 +260,7 @@ export default function DashboardPage() {
               ].map(({ label, value, delta }) => (
                 <div
                   key={label}
-                  className="rounded-xl border border-default-200 bg-white p-3.5 shadow-sm"
+                  className="rounded-xl border border-default-200 bg-content1 p-3.5 shadow-sm"
                 >
                   <p className="text-xs font-medium text-default-500">
                     {label}
@@ -273,7 +273,7 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold text-default-900">
@@ -316,7 +316,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+            <div className="rounded-2xl border border-default-200 bg-content1 shadow-sm">
               <div className="border-b border-default-200 px-4 py-3">
                 <h2 className="text-sm font-semibold text-default-900">
                   Error Groups
@@ -365,7 +365,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+              <div className="rounded-2xl border border-default-200 bg-content1 shadow-sm">
                 <div className="border-b border-default-200 px-4 py-3">
                   <h3 className="text-sm font-semibold text-default-900">
                     Alerts
@@ -403,7 +403,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+              <div className="rounded-2xl border border-default-200 bg-content1 shadow-sm">
                 <div className="border-b border-default-200 px-4 py-3">
                   <h3 className="text-sm font-semibold text-default-900">
                     Endpoints
@@ -439,7 +439,7 @@ export default function DashboardPage() {
         )}
       </div>
 
-      <aside className="h-fit rounded-2xl border border-default-200 bg-white shadow-sm xl:sticky xl:top-6">
+      <aside className="h-fit rounded-2xl border border-default-200 bg-content1 shadow-sm xl:sticky xl:top-6">
         <div className="border-b border-default-200 px-4 py-3">
           <h2 className="text-base font-semibold text-default-900">
             Run results
