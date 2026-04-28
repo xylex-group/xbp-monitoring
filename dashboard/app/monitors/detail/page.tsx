@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import { getProbeResults, listProbes, listProbeStatuses, triggerProbe } from "@/lib/api";
 import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
+import { ResponseBodyView } from "@/components/ResponseBodyView";
 
 function MonitorDetailContent() {
   const router = useRouter();
@@ -154,9 +155,7 @@ function MonitorDetailContent() {
                 result.response.sensitive ? (
                   <p className="text-xs italic text-default-500">[Response body redacted — sensitive]</p>
                 ) : result.response.body ? (
-                  <pre className="max-h-52 overflow-auto rounded-lg bg-default-50 p-3 text-xs whitespace-pre-wrap dark:bg-default-100/10">
-                    {result.response.body}
-                  </pre>
+                  <ResponseBodyView body={result.response.body} />
                 ) : (
                   <p className="text-xs text-default-500">No response body</p>
                 )

@@ -5,6 +5,7 @@ import { Button, Chip, Drawer, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { getProbeResults } from "@/lib/api";
 import type { ProbeResult } from "@/lib/types";
+import { ResponseBodyView } from "@/components/ResponseBodyView";
 
 interface Props {
   probeName: string | null;
@@ -69,10 +70,7 @@ export function ResultsDrawer({ probeName, onClose }: Props) {
                         HTTP {result.response.status_code}
                       </span>
                       {!result.response.sensitive && result.response.body && (
-                        <pre className="text-xs bg-surface-secondary rounded-lg p-2 overflow-auto max-h-40 whitespace-pre-wrap">
-                          {result.response.body.substring(0, 500)}
-                          {result.response.body.length > 500 && "…"}
-                        </pre>
+                        <ResponseBodyView body={result.response.body} />
                       )}
                       {result.response.sensitive && (
                         <span className="text-xs text-muted italic">
