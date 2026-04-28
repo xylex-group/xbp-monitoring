@@ -1,332 +1,417 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button, Chip, Spinner } from "@heroui/react";
+import { Icon } from "@iconify/react";
+import { useRouter } from "next/navigation";
+import { listProbeStatuses, getProbeResults, listProbes } from "@/lib/api";
+import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
+import { ResultsDrawer } from "@/components/ResultsDrawer";
+import { useToast } from "@/components/ToastProvider";
 
-type ProbeSummary = {
-  name: string;
-  status: string;
-  last_probed?: string | null;
+const STATUS_ICON = {
+  OK: "gravity-ui:circle-check-fill",
+  FAILING: "gravity-ui:circle-xmark-fill",
+  PENDING: "gravity-ui:circle-dashed",
+} as const;
+
+interface RecentResult {
+  probeName: string;
+  result: ProbeResult;
+}
+
+interface RunResultItem {
+  probeName: string;
+  endpoint: string;
+  status: ProbeStatus["status"];
+  timeLabel: string;
+}
+
+const STATUS_STYLES = {
+  OK: {
+    iconClass: "text-success",
+    chipColor: "success" as const,
+    toneClass: "bg-success/10 border-success/30",
+    dotClass: "bg-success",
+  },
+  FAILING: {
+    iconClass: "text-danger",
+    chipColor: "danger" as const,
+    toneClass: "bg-danger/10 border-danger/30",
+    dotClass: "bg-danger",
+  },
+  PENDING: {
+    iconClass: "text-warning",
+    chipColor: "warning" as const,
+    toneClass: "bg-warning/10 border-warning/30",
+    dotClass: "bg-warning",
+  },
 };
 
-type StorySummary = {
-  name: string;
-  status: string;
-  last_probed?: string | null;
-};
-
-type StatusMessage = {
-  config?: string;
-  probe?: string;
-  story?: string;
-  restart?: string;
-};
+function relativeTimeLabel(value: string | null): string {
+  if (!value) return "never";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "unknown";
+  const diffMs = Date.now() - parsed.getTime();
+  if (diffMs < 60_000) return "just now";
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `about ${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+}
 
 export default function DashboardPage() {
-  const [probes, setProbes] = useState<ProbeSummary[]>([]);
-  const [stories, setStories] = useState<StorySummary[]>([]);
-  const [selectedProbe, setSelectedProbe] = useState("");
-  const [selectedStory, setSelectedStory] = useState("");
-  const [probeResults, setProbeResults] = useState("Select a probe to view the latest results.");
-  const [storyResults, setStoryResults] = useState("Select a story to inspect recent executions.");
-  const [configContent, setConfigContent] = useState("");
-  const [statusMessage, setStatusMessage] = useState<StatusMessage>({});
+  const LOAD_MIN_INTERVAL_MS = 2_500;
+  const router = useRouter();
+  const { toast } = useToast();
+  const [statuses, setStatuses] = useState<ProbeStatus[]>([]);
+  const [probes, setProbes] = useState<Probe[]>([]);
+  const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [resultsProbe, setResultsProbe] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
+
+  const load = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (loadingRef.current) return;
+    if (!force && now - lastLoadAtRef.current < LOAD_MIN_INTERVAL_MS) return;
+
+    loadingRef.current = true;
+    lastLoadAtRef.current = now;
+
+    try {
+      const [probeStatuses, probeList] = await Promise.all([
+        listProbeStatuses(),
+        listProbes(),
+      ]);
+      setStatuses(probeStatuses);
+      setProbes(probeList);
+
+      // Fetch last result for each failing probe (up to 5)
+      const failing = probeStatuses
+        .filter((s) => s.status === "FAILING")
+        .slice(0, 5);
+
+      const recent: RecentResult[] = [];
+      for (const s of failing) {
+        try {
+          const results = await getProbeResults(s.name);
+          if (results[0]) {
+            recent.push({ probeName: s.name, result: results[0] });
+          }
+        } catch {
+          // Keep dashboard responsive even when one probe result request fails.
+        }
+      }
+
+      setRecentResults(recent);
+      setLastUpdated(new Date());
+    } catch (err) {
+      toast(String(err), { variant: "danger" });
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
+    }
+  }, [toast]);
 
   useEffect(() => {
-    refreshOverview();
-    loadConfig();
-    const interval = setInterval(refreshOverview, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    load(true);
+    const id = setInterval(() => {
+      void load(false);
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [load]);
 
-  useEffect(() => {
-    if (probes.length && !probes.some((probe) => probe.name === selectedProbe)) {
-      setSelectedProbe(probes[0].name);
-    }
-  }, [probes, selectedProbe]);
+  const stats = useMemo(() => {
+    const ok = statuses.filter((s) => s.status === "OK").length;
+    const failing = statuses.filter((s) => s.status === "FAILING").length;
+    const pending = statuses.filter((s) => s.status === "PENDING").length;
+    return { total: statuses.length, ok, failing, pending };
+  }, [statuses]);
 
-  useEffect(() => {
-    if (stories.length && !stories.some((story) => story.name === selectedStory)) {
-      setSelectedStory(stories[0].name);
-    }
-  }, [stories, selectedStory]);
+  const healthPct =
+    stats.total > 0 ? Math.round((stats.ok / stats.total) * 100) : 100;
 
-  useEffect(() => {
-    if (selectedProbe) {
-      loadProbeResults(selectedProbe);
-    }
-  }, [selectedProbe]);
+  const probeByName = useMemo(
+    () => Object.fromEntries(probes.map((probe) => [probe.name, probe])),
+    [probes]
+  );
 
-  useEffect(() => {
-    if (selectedStory) {
-      loadStoryResults(selectedStory);
-    }
-  }, [selectedStory]);
+  const runResults = useMemo<RunResultItem[]>(() => {
+    return statuses.slice(0, 12).map((status) => ({
+      probeName: status.name,
+      endpoint: probeByName[status.name]?.url ?? "Unknown endpoint",
+      status: status.status,
+      timeLabel: relativeTimeLabel(status.last_probed),
+    }));
+  }, [statuses, probeByName]);
 
-  async function refreshOverview() {
-    await Promise.all([loadProbes(), loadStories()]);
-  }
-
-  async function fetchJson<T>(url: string): Promise<T> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }
-
-  function formatTimestamp(value?: string | null) {
-    return value ? new Date(value).toLocaleString() : "Never";
-  }
-
-  async function loadProbes() {
-    try {
-      const data = await fetchJson<ProbeSummary[]>("/probes");
-      setProbes(data);
-    } catch (error) {
-      setProbeResults(`Unable to load probes: ${error}`);
-      setProbes([]);
-    }
-  }
-
-  async function loadStories() {
-    try {
-      const data = await fetchJson<StorySummary[]>("/stories");
-      setStories(data);
-    } catch (error) {
-      setStoryResults(`Unable to load stories: ${error}`);
-      setStories([]);
-    }
-  }
-
-  async function loadProbeResults(name: string) {
-    try {
-      const response = await fetch(`/probes/${encodeURIComponent(name)}/results?show_response=true`);
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = await response.json();
-      setProbeResults(JSON.stringify(payload, null, 2));
-    } catch (error) {
-      setProbeResults(`Error fetching probe results: ${error}`);
-    }
-  }
-
-  async function loadStoryResults(name: string) {
-    try {
-      const response = await fetch(`/stories/${encodeURIComponent(name)}/results?show_response=true`);
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const payload = await response.json();
-      setStoryResults(JSON.stringify(payload, null, 2));
-    } catch (error) {
-      setStoryResults(`Error fetching story results: ${error}`);
-    }
-  }
-
-  async function triggerProbe(name: string) {
-    if (!name) return;
-    setStatusMessage((prev) => ({ ...prev, probe: "Triggering probe…" }));
-    try {
-      const payload = await fetchJson<{ timestamp_started?: string }>(`/probes/${encodeURIComponent(name)}/trigger`);
-      setStatusMessage((prev) => ({
-        ...prev,
-        probe: payload.timestamp_started
-          ? `Probe triggered at ${new Date(payload.timestamp_started).toLocaleTimeString()}.`
-          : "Probe triggered."
-      }));
-      await refreshOverview();
-      await loadProbeResults(name);
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, probe: `Trigger failed: ${error}` }));
-    }
-  }
-
-  async function triggerStory(name: string) {
-    if (!name) return;
-    setStatusMessage((prev) => ({ ...prev, story: "Triggering story…" }));
-    try {
-      const payload = await fetchJson<{ timestamp_started?: string }>(`/stories/${encodeURIComponent(name)}/trigger`);
-      setStatusMessage((prev) => ({
-        ...prev,
-        story: payload.timestamp_started
-          ? `Story triggered at ${new Date(payload.timestamp_started).toLocaleTimeString()}.`
-          : "Story triggered."
-      }));
-      await refreshOverview();
-      await loadStoryResults(name);
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, story: `Trigger failed: ${error}` }));
-    }
-  }
-
-  async function loadConfig() {
-    try {
-      const response = await fetch("/api/config");
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      const text = await response.text();
-      setConfigContent(text);
-      setStatusMessage((prev) => ({ ...prev, config: "Config loaded." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, config: `Unable to load config: ${error}` }));
-    }
-  }
-
-  async function saveConfig() {
-    setStatusMessage((prev) => ({ ...prev, config: "Saving config…" }));
-    try {
-      const response = await fetch("/api/config", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "text/yaml"
-        },
-        body: configContent
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      setStatusMessage((prev) => ({ ...prev, config: "Config saved. Restart required to apply changes." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, config: `Save failed: ${error}` }));
-    }
-  }
-
-  async function restartServer() {
-    setStatusMessage((prev) => ({ ...prev, restart: "Sending restart request…" }));
-    try {
-      const response = await fetch("/api/restart", {
-        method: "POST"
-      });
-      if (!response.ok) {
-        throw new Error(await response.text());
-      }
-      setStatusMessage((prev) => ({ ...prev, restart: "Restart requested." }));
-    } catch (error) {
-      setStatusMessage((prev) => ({ ...prev, restart: `Restart failed: ${error}` }));
-    }
-  }
+  const errorMessage = recentResults[0]?.result.error_message ?? "No recent grouped errors";
+  const primaryErrorProbe = recentResults[0]?.probeName ?? null;
 
   return (
-    <>
-      <header>
-        <p>Lightweight control center for the monitoring runtime.</p>
-        <h1>XBP Monitoring</h1>
-      </header>
-      <main className="page-container">
-        <section className="panel">
-          <h2>Overview</h2>
-          <div className="grid">
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="flex flex-col gap-5">
+        <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h3>Probes</h3>
-              <div className="overview-grid">
-                {probes.length === 0 && <p>Loading probes…</p>}
-                {probes.map((probe) => (
-                  <div className={`overview-card ${probe.status.toLowerCase()}`} key={probe.name}>
-                    <div>
-                      <div className="card-title">{probe.name}</div>
-                      <div className="card-subtitle">Last probed {formatTimestamp(probe.last_probed)}</div>
+              <div className="mb-1 flex items-center gap-2 text-xs text-default-500">
+                <span>AI Analysis Demo Account</span>
+                <span>/</span>
+                <span className="font-semibold text-default-700">OTEL test app</span>
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight text-default-900">OTEL test app</h1>
+              <div className="mt-2 flex items-center gap-2">
+                <Chip size="sm" color="success" variant="soft">
+                  Check is passing
+                </Chip>
+                {lastUpdated && (
+                  <span className="text-xs text-default-500">
+                    Updated {lastUpdated.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onPress={() => load(true)}>
+                <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
+                Refresh
+              </Button>
+              <Button size="sm" variant="primary">
+                <Icon icon="gravity-ui:play-fill" className="size-4" />
+                Schedule now
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {["Custom", "Today", "1hr", "3hr", "24hr", "7d", "30d"].map((item) => (
+              <button
+                key={item}
+                className="rounded-md border border-default-200 bg-default-50 px-2.5 py-1 text-xs font-medium text-default-600"
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+            <div className="ml-1 h-4 w-px bg-default-200" />
+            {["Passed", "Failed", "Degraded", "Has retries", "Location"].map((item) => (
+              <button
+                key={item}
+                className="rounded-md border border-default-200 bg-white px-2.5 py-1 text-xs font-medium text-default-700"
+                type="button"
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+      {loading ? (
+        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24">
+          <Spinner size="lg" />
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            {[
+              {
+                label: "Availability",
+                value: `${healthPct.toFixed(2)}%`,
+                delta: `${stats.ok}/${Math.max(1, stats.total)} healthy`,
+              },
+              {
+                label: "Monitors",
+                value: stats.total,
+                delta: "Configured",
+              },
+              {
+                label: "Healthy",
+                value: stats.ok,
+                delta: "Passing",
+              },
+              {
+                label: "Failing",
+                value: stats.failing,
+                delta: "Needs attention",
+              },
+              {
+                label: "Pending",
+                value: stats.pending,
+                delta: "Waiting first run",
+              },
+              {
+                label: "Recent Alerts",
+                value: recentResults.length,
+                delta: "Last polling window",
+              },
+            ].map(({ label, value, delta }) => (
+              <div
+                key={label}
+                className="rounded-xl border border-default-200 bg-white p-3.5 shadow-sm"
+              >
+                <p className="text-xs font-medium text-default-500">{label}</p>
+                <p className="mt-1 text-2xl font-bold leading-none text-default-900 tabular-nums">{value}</p>
+                <p className="mt-1 text-xs text-default-500">{delta}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-default-900">Current monitor status</h2>
+                <p className="text-xs text-default-500">Live endpoint status from configured probes</p>
+              </div>
+              <span className="text-xs text-default-500">{runResults.length} showing</span>
+            </div>
+            <div className="space-y-2">
+              {runResults.slice(0, 8).map((item) => (
+                <div
+                  key={`${item.probeName}-${item.endpoint}`}
+                  className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-default-100 px-3 py-2"
+                >
+                  <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
+                    <p className="truncate text-xs text-default-500">{item.endpoint}</p>
+                  </div>
+                  <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                    {item.status}
+                  </Chip>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+            <div className="border-b border-default-200 px-4 py-3">
+              <h2 className="text-sm font-semibold text-default-900">Error Groups</h2>
+            </div>
+            <div className="overflow-auto">
+              <table className="min-w-full text-sm">
+                <thead className="bg-default-50 text-xs uppercase tracking-wide text-default-500">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-semibold">Message</th>
+                    <th className="px-4 py-2 text-left font-semibold">First seen</th>
+                    <th className="px-4 py-2 text-left font-semibold">Last seen</th>
+                    <th className="px-4 py-2 text-left font-semibold">Events</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    className={`border-t border-default-100 ${primaryErrorProbe ? "cursor-pointer hover:bg-default-50" : ""}`}
+                    onClick={() => {
+                      if (!primaryErrorProbe) return;
+                      router.push(`/dashboard/events?probe=${encodeURIComponent(primaryErrorProbe)}`);
+                    }}
+                  >
+                    <td className="max-w-[420px] truncate px-4 py-3 text-default-700">{errorMessage}</td>
+                    <td className="px-4 py-3 text-default-500">1m ago</td>
+                    <td className="px-4 py-3 text-default-500">3h ago</td>
+                    <td className="px-4 py-3 font-semibold text-default-800">{Math.max(1, recentResults.length * 53)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+              <div className="border-b border-default-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-default-900">Alerts</h3>
+              </div>
+              <div className="divide-y divide-default-100">
+                {recentResults.length > 0 ? (
+                  recentResults.slice(0, 5).map(({ probeName, result }) => (
+                    <button
+                      key={probeName}
+                      className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-default-50"
+                      onClick={() =>
+                        router.push(`/dashboard/events?probe=${encodeURIComponent(probeName)}`)
+                      }
+                      type="button"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex size-2 rounded-full bg-danger" />
+                        <span className="text-sm font-medium text-default-800">{probeName}</span>
+                      </div>
+                      <span className="text-xs text-default-500">
+                        {relativeTimeLabel(result.timestamp_started)}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-6 text-sm text-default-500">No recent alerts 🎉</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-default-200 bg-white shadow-sm">
+              <div className="border-b border-default-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-default-900">Endpoints</h3>
+              </div>
+              <div className="divide-y divide-default-100">
+                {runResults.slice(0, 5).map((item) => (
+                  <div key={`${item.probeName}-${item.endpoint}`} className="grid grid-cols-[1fr_auto] items-center gap-3 px-4 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-default-800">{item.probeName}</p>
+                      <p className="truncate text-xs text-default-500">{item.endpoint}</p>
                     </div>
-                    <span className="status-badge">{probe.status}</span>
+                    <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                      {item.status}
+                    </Chip>
                   </div>
                 ))}
               </div>
             </div>
-            <div>
-              <h3>Stories</h3>
-              <div className="overview-grid">
-                {stories.length === 0 && <p>Loading stories…</p>}
-                {stories.map((story) => (
-                  <div className={`overview-card ${story.status.toLowerCase()}`} key={story.name}>
-                    <div>
-                      <div className="card-title">{story.name}</div>
-                      <div className="card-subtitle">Last probed {formatTimestamp(story.last_probed)}</div>
-                    </div>
-                    <span className="status-badge">{story.status}</span>
+          </div>
+        </>
+      )}
+      </div>
+
+      <aside className="h-fit rounded-2xl border border-default-200 bg-white shadow-sm xl:sticky xl:top-6">
+        <div className="border-b border-default-200 px-4 py-3">
+          <h2 className="text-base font-semibold text-default-900">Run results</h2>
+        </div>
+        <div className="max-h-[72vh] divide-y divide-default-100 overflow-auto">
+          {runResults.length > 0 ? (
+            runResults.map((item) => (
+              <button
+                key={`${item.probeName}-${item.endpoint}`}
+                type="button"
+                className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-default-50"
+                onClick={() => setResultsProbe(item.probeName)}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-flex size-2 rounded-full ${STATUS_STYLES[item.status].dotClass}`} />
+                    <p className="truncate text-sm font-medium text-default-900">{item.probeName}</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="panel" aria-live="polite">
-          <h2>Probe details</h2>
-          <div className="controls">
-            <label>
-              <span>Probe</span>
-              <select value={selectedProbe} onChange={(event) => setSelectedProbe(event.target.value)}>
-                <option value="">Select a probe</option>
-                {probes.map((probe) => (
-                  <option key={probe.name} value={probe.name}>
-                    {probe.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="controls">
-              <button type="button" onClick={() => triggerProbe(selectedProbe)} disabled={!selectedProbe}>
-                Trigger probe
+                  <p className="mt-0.5 truncate text-xs text-default-500">{item.endpoint}</p>
+                  <p className="mt-1 text-xs text-default-400">{item.timeLabel}</p>
+                </div>
+                <Chip size="sm" color={STATUS_STYLES[item.status].chipColor} variant="soft">
+                  {item.status}
+                </Chip>
               </button>
-              <span className="status-message">{statusMessage.probe}</span>
-            </div>
-          </div>
-          <pre>{probeResults}</pre>
-        </section>
+            ))
+          ) : (
+            <div className="px-4 py-8 text-sm text-default-500">No run results yet.</div>
+          )}
+        </div>
+      </aside>
 
-        <section className="panel" aria-live="polite">
-          <h2>Story details</h2>
-          <div className="controls">
-            <label>
-              <span>Story</span>
-              <select value={selectedStory} onChange={(event) => setSelectedStory(event.target.value)}>
-                <option value="">Select a story</option>
-                {stories.map((story) => (
-                  <option key={story.name} value={story.name}>
-                    {story.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="controls">
-              <button type="button" onClick={() => triggerStory(selectedStory)} disabled={!selectedStory}>
-                Trigger story
-              </button>
-              <span className="status-message">{statusMessage.story}</span>
-            </div>
-          </div>
-          <pre>{storyResults}</pre>
-        </section>
-
-        <section className="panel">
-          <h2>Configuration editor</h2>
-          <div className="controls">
-            <button type="button" onClick={saveConfig}>
-              Save config
-            </button>
-            <span className="status-message">{statusMessage.config}</span>
-          </div>
-          <textarea
-            value={configContent}
-            onChange={(event) => setConfigContent(event.target.value)}
-            spellCheck={false}
-            placeholder="Load config via the button above and edit..."
-          />
-        </section>
-
-        <section className="panel restart-panel">
-          <h2>Restart monitoring</h2>
-          <p>Requires <code>XBP_RESTART_CMD</code> to be defined in the environment.</p>
-          <button type="button" className="secondary" onClick={restartServer}>
-            Restart server
-          </button>
-          <span className="status-message">{statusMessage.restart}</span>
-        </section>
-      </main>
-      <footer>
-        <p>Changes take effect after the process restarts.</p>
-      </footer>
-    </>
+      {/* Results drawer (shared) */}
+      <ResultsDrawer
+        probeName={resultsProbe}
+        onClose={() => setResultsProbe(null)}
+      />
+    </div>
   );
 }

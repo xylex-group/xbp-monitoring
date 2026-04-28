@@ -1,66 +1,25 @@
 probes:
-- name: athena-db
-  url: https://athena-db.com
-  http_method: GET
-  with:
-    headers:
-      user-agent: XBP Probe/0.9.4
-  expectations:
-  - field: StatusCode
-    operation: Equals
-    value: "200"
-  schedule:
-    initial_delay: 0
-    interval: 60
-  alerts:
-  - url: https://webhook.site/32016ae5-c886-4a96-b2d8-1b10907f41c8
-  tags:
-    system: athena
-    component: athena-db
-    owner: floris@xylex.group
-
-- name: athena-mirror2
-  url: https://mirror2.athena-db.com
-  http_method: GET
-  with:
-    headers:
-      user-agent: XBP Probe/0.9.4
-  expectations:
-  - field: StatusCode
-    operation: Equals
-    value: "200"
-  schedule:
-    initial_delay: 0
-    interval: 60
-  alerts:
-  - url: https://webhook.site/32016ae5-c886-4a96-b2d8-1b10907f41c8
-  tags:
-    system: athena
-    component: mirror2
-    owner: floris
-
-# stories:
-# - name: get-ip-user-flow
-#   steps:
-#   - name: get-ip
-#     url: https://api.ipify.org/?format=json
-#     http_method: GET
-#     expectations:
-#     - field: StatusCode
-#       operation: Equals
-#       value: "200"
-#   - name: get-location
-#     url: https://ipinfo.io/${{ steps.get-ip.body.ip }}/geo
-#     http_method: GET
-#     expectations:
-#     - field: StatusCode
-#       operation: Equals
-#       value: "200"
-#   schedule:
-#     initial_delay: 0
-#     interval: 20
-#   alerts:
-#   - url: https://webhook.site/54a9a526-c104-42a7-9b76-788e897390d8
-#   tags:
-#     team: team1
-#     tier: sev0
+  - name: athena-cluster.com
+    url: https://athena-cluster.com
+    http_method: GET
+    schedule:
+      initial_delay: 0
+      interval: 60
+    expectations:
+      - field: StatusCode
+        operation: Equals
+        value: '200'
+    alerts: []
+    sensitive: false
+  - name: athena-mirror3
+    url: https://mirror3.athena-db.com
+    http_method: GET
+    schedule:
+      initial_delay: 0
+      interval: 60
+    expectations:
+      - field: StatusCode
+        operation: Equals
+        value: '200'
+    alerts: []
+    sensitive: false

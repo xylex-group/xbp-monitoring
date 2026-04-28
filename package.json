@@ -1,0 +1,14 @@
+{
+  "name": "xbp-monitoring-workspace",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --dir dashboard run dev",
+    "build": "pnpm --dir dashboard run build",
+    "lint": "pnpm --dir dashboard run lint",
+    "typecheck": "pnpm --dir dashboard run typecheck",
+    "dashboard:dev": "pnpm --dir dashboard run dev",
+    "dashboard:build": "pnpm --dir dashboard run build",
+    "dashboard:lint": "pnpm --dir dashboard run lint",
+    "dashboard:typecheck": "pnpm --dir dashboard run typecheck"
+  }
+}
