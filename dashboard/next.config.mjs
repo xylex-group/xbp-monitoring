@@ -11,9 +11,21 @@ const nextConfig = {
     ? {
         async rewrites() {
           return [
-            { source: "/api/:path*", destination: "http://127.0.0.1:3000/api/:path*" },
-            { source: "/probes/:path*", destination: "http://127.0.0.1:3000/probes/:path*" },
-            { source: "/stories/:path*", destination: "http://127.0.0.1:3000/stories/:path*" },
+            {
+              source: "/api/probes/:path*",
+              destination: "http://127.0.0.1:3000/probes/:path*",
+              basePath: false,
+            },
+            {
+              source: "/api/stories/:path*",
+              destination: "http://127.0.0.1:3000/stories/:path*",
+              basePath: false,
+            },
+            {
+              source: "/api/:path*",
+              destination: "http://127.0.0.1:3000/api/:path*",
+              basePath: false,
+            },
           ];
         },
       }

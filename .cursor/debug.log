@@ -397,3 +397,11 @@
 {"data":{"method":"GET","status":200,"url":"https://athena-db.com"},"hypothesisId":"E","location":"http_probe.rs:call_endpoint","message":"response received","runId":"pre-fix","sessionId":"debug-session","timestamp":1772171281746}
 {"data":{"method":"GET","status":200,"url":"https://mirror2.athena-db.com"},"hypothesisId":"E","location":"http_probe.rs:call_endpoint","message":"response received","runId":"pre-fix","sessionId":"debug-session","timestamp":1772171341737}
 {"data":{"method":"GET","status":200,"url":"https://athena-db.com"},"hypothesisId":"E","location":"http_probe.rs:call_endpoint","message":"response received","runId":"pre-fix","sessionId":"debug-session","timestamp":1772171341739}
+{"data":{"value":null},"hypothesisId":"A","location":"metrics.rs:initialize","message":"env OTEL_METRICS_EXPORTER","runId":"pre-fix","sessionId":"debug-session","timestamp":1777342896251}
+{"data":{},"hypothesisId":"B","location":"metrics.rs:initialize","message":"no exporter configured","runId":"pre-fix","sessionId":"debug-session","timestamp":1777342896256}
+{"data":{"has_traces":true},"hypothesisId":"D","location":"tracing.rs:create_tracer","message":"tracer initialized","runId":"pre-fix","sessionId":"debug-session","timestamp":1777342896268}
+{"data":{},"hypothesisId":"C","location":"metrics.rs:new","message":"meter created","runId":"pre-fix","sessionId":"debug-session","timestamp":1777342896301}
+{"data":{"value":null},"hypothesisId":"A","location":"metrics.rs:initialize","message":"env OTEL_METRICS_EXPORTER","runId":"pre-fix","sessionId":"debug-session","timestamp":1777343044064}
+{"data":{},"hypothesisId":"B","location":"metrics.rs:initialize","message":"no exporter configured","runId":"pre-fix","sessionId":"debug-session","timestamp":1777343044065}
+{"data":{"has_traces":true},"hypothesisId":"D","location":"tracing.rs:create_tracer","message":"tracer initialized","runId":"pre-fix","sessionId":"debug-session","timestamp":1777343044065}
+{"data":{},"hypothesisId":"C","location":"metrics.rs:new","message":"meter created","runId":"pre-fix","sessionId":"debug-session","timestamp":1777343044068}

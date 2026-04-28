@@ -6,12 +6,17 @@ import type {
   TriggerResponse,
 } from "./types";
 
+import { getApiUrl } from "./useApiUrl";
+
 /**
  * Base URL for API requests.
  * - Production (Rust serves dashboard + API on same origin): empty string
- * - Local Next dev: optionally set NEXT_PUBLIC_API_BASE_URL, e.g. http://127.0.0.1:3000
+ * - Local Next dev: set via dashboard settings or NEXT_PUBLIC_API_BASE_URL env var
+ * - Users can customize via Config page settings
  */
-const BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+function getBASE(): string {
+  return getApiUrl();
+}
 
 function isHtmlContent(contentType: string, body: string): boolean {
   return contentType.includes("text/html") || /^\s*<!DOCTYPE html/i.test(body);
@@ -22,6 +27,7 @@ function shorten(text: string, max = 240): string {
 }
 
 function buildEndpoint(path: string): string {
+  const BASE = getBASE();
   return `${BASE}${path}`;
 }
 
@@ -66,18 +72,18 @@ async function request<T>(
 // ── Probes status overview ────────────────────────────────────────────────────
 
 export function listProbeStatuses(): Promise<ProbeStatus[]> {
-  return request<ProbeStatus[]>("/probes");
+  return request<ProbeStatus[]>('/api/probes');
 }
 
 export function getProbeResults(name: string): Promise<ProbeResult[]> {
   return request<ProbeResult[]>(
-    `/probes/${encodeURIComponent(name)}/results?show_response=true`
+    `/api/probes/${encodeURIComponent(name)}/results?show_response=true`
   );
 }
 
 export function triggerProbe(name: string): Promise<TriggerResponse> {
   return request<TriggerResponse>(
-    `/probes/${encodeURIComponent(name)}/trigger`
+    `/api/probes/${encodeURIComponent(name)}/trigger`
   );
 }
 

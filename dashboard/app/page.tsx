@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, Chip, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { useRouter } from "next/navigation";
 import { listProbeStatuses, getProbeResults } from "@/lib/api";
 import type { ProbeResult, ProbeStatus } from "@/lib/types";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
@@ -83,14 +84,25 @@ function relativeTimeLabel(value: string | null): string {
 }
 
 export default function DashboardPage() {
+  const LOAD_MIN_INTERVAL_MS = 2_500;
+  const router = useRouter();
   const { toast } = useToast();
   const [statuses, setStatuses] = useState<ProbeStatus[]>([]);
   const [recentResults, setRecentResults] = useState<RecentResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [resultsProbe, setResultsProbe] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const loadingRef = useRef(false);
+  const lastLoadAtRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (loadingRef.current) return;
+    if (!force && now - lastLoadAtRef.current < LOAD_MIN_INTERVAL_MS) return;
+
+    loadingRef.current = true;
+    lastLoadAtRef.current = now;
+
     try {
       const probeStatuses = await listProbeStatuses();
       setStatuses(probeStatuses);
@@ -100,30 +112,33 @@ export default function DashboardPage() {
         .filter((s) => s.status === "FAILING")
         .slice(0, 5);
 
-      const resultsSettled = await Promise.allSettled(
-        failing.map(async (s) => {
+      const recent: RecentResult[] = [];
+      for (const s of failing) {
+        try {
           const results = await getProbeResults(s.name);
-          return results[0] ? { probeName: s.name, result: results[0] } : null;
-        })
-      );
-      const recent: RecentResult[] = resultsSettled
-        .filter(
-          (r): r is PromiseFulfilledResult<RecentResult> =>
-            r.status === "fulfilled" && r.value !== null
-        )
-        .map((r) => r.value);
+          if (results[0]) {
+            recent.push({ probeName: s.name, result: results[0] });
+          }
+        } catch {
+          // Keep dashboard responsive even when one probe result request fails.
+        }
+      }
+
       setRecentResults(recent);
       setLastUpdated(new Date());
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {
+      loadingRef.current = false;
       setLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
-    load();
-    const id = setInterval(load, 30_000);
+    load(true);
+    const id = setInterval(() => {
+      void load(false);
+    }, 30_000);
     return () => clearInterval(id);
   }, [load]);
 
@@ -174,6 +189,7 @@ export default function DashboardPage() {
     stats.total > 0 ? Number(((stats.failing / stats.total) * 2.6).toFixed(1)) : 0;
   const failureAlerts = Math.max(0, stats.failing * 27);
   const errorMessage = recentResults[0]?.result.error_message ?? "No recent grouped errors";
+  const primaryErrorProbe = recentResults[0]?.probeName ?? null;
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -200,7 +216,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onPress={load}>
+              <Button variant="ghost" size="sm" onPress={() => load(true)}>
                 <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
                 Refresh
               </Button>
@@ -326,7 +342,13 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-t border-default-100">
+                  <tr
+                    className={`border-t border-default-100 ${primaryErrorProbe ? "cursor-pointer hover:bg-default-50" : ""}`}
+                    onClick={() => {
+                      if (!primaryErrorProbe) return;
+                      router.push(`/dashboard/events?probe=${encodeURIComponent(primaryErrorProbe)}`);
+                    }}
+                  >
                     <td className="max-w-[420px] truncate px-4 py-3 text-default-700">{errorMessage}</td>
                     <td className="px-4 py-3 text-default-500">1m ago</td>
                     <td className="px-4 py-3 text-default-500">3h ago</td>
@@ -348,7 +370,9 @@ export default function DashboardPage() {
                     <button
                       key={probeName}
                       className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-default-50"
-                      onClick={() => setResultsProbe(probeName)}
+                      onClick={() =>
+                        router.push(`/dashboard/events?probe=${encodeURIComponent(probeName)}`)
+                      }
                       type="button"
                     >
                       <div className="flex items-center gap-2">

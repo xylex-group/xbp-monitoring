@@ -7,6 +7,7 @@ import { listProbeStatuses } from "@/lib/api";
 
 export function BackendStatusBanner() {
   const [offline, setOffline] = useState(false);
+  const [hasChecked, setHasChecked] = useState(false);
   const [checking, setChecking] = useState(false);
 
   const checkBackend = useCallback(async () => {
@@ -18,38 +19,34 @@ export function BackendStatusBanner() {
       setOffline(true);
     } finally {
       setChecking(false);
+      setHasChecked(true);
     }
   }, []);
 
   useEffect(() => {
     checkBackend();
-    const interval = setInterval(checkBackend, 20_000);
-    return () => clearInterval(interval);
+    // Only check once on mount; don't continuously poll to avoid spam
   }, [checkBackend]);
 
-  if (!offline) return null;
+  // Only show banner if initial check failed
+  if (!offline || !hasChecked) return null;
 
   return (
-    <div className="mb-4 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-danger shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <Icon icon="gravity-ui:triangle-exclamation-fill" className="mt-0.5 size-4 shrink-0" />
-          <div>
-            <p className="text-sm font-semibold">Backend connection lost</p>
-            <p className="text-xs text-danger/80">
-              The dashboard cannot reach the monitoring API. Ensure Rust backend is running on port 3000.
-            </p>
-          </div>
+    <div className="mb-3 rounded-lg border border-warning/40 bg-warning/5 px-3 py-2.5 text-warning-700 text-sm shadow-none">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon icon="gravity-ui:triangle-exclamation-fill" className="size-3.5 shrink-0" />
+          <span className="font-medium">Backend offline</span>
         </div>
 
         <Button
           size="sm"
           variant="ghost"
-          className="border border-danger/30"
+          className="h-7 min-w-fit"
           onPress={checkBackend}
           isPending={checking}
         >
-          <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
+          <Icon icon="gravity-ui:arrow-rotate-right" className="size-3" />
           Retry
         </Button>
       </div>

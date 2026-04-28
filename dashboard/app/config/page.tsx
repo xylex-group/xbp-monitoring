@@ -1,17 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Spinner } from "@heroui/react";
+import { Button, Input, Label, TextField, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
+import { useApiUrl } from "@/lib/useApiUrl";
 import { useToast } from "@/components/ToastProvider";
 import { restartServer } from "@/lib/api";
 
 export default function ConfigPage() {
   const { toast } = useToast();
+  const { url: apiUrl, setUrl: setApiUrl, mounted } = useApiUrl();
   const [yaml, setYaml] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [restarting, setRestarting] = useState(false);
+  const [tempApiUrl, setTempApiUrl] = useState("");
 
   const loadConfig = useCallback(async () => {
     try {
@@ -28,6 +31,10 @@ export default function ConfigPage() {
   useEffect(() => {
     loadConfig();
   }, [loadConfig]);
+
+  useEffect(() => {
+    if (mounted) setTempApiUrl(apiUrl);
+  }, [apiUrl, mounted]);
 
   async function handleSave() {
     setSaving(true);
@@ -57,6 +64,16 @@ export default function ConfigPage() {
     } finally {
       setRestarting(false);
     }
+  }
+
+  function handleSaveApiUrl() {
+    setApiUrl(tempApiUrl);
+    toast("API base URL saved.", { variant: "success" });
+  }
+
+  function resetApiUrl() {
+    setTempApiUrl(apiUrl);
+    toast("Changes discarded.", { variant: "warning" });
   }
 
   return (
@@ -95,6 +112,34 @@ export default function ConfigPage() {
           </Button>
         </div>
       </div>
+
+      {mounted && (
+        <div className="rounded-xl border border-default-200 bg-white p-5 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-sm font-semibold text-default-900">API Settings</h2>
+            <p className="text-xs text-default-500 mt-1">
+              Configure where the dashboard sends API requests. Leave empty to use the same origin (production).
+            </p>
+          </div>
+          <div className="space-y-3">
+            <TextField className="max-w-md" name="api-base-url">
+              <Label>API Base URL</Label>
+              <Input
+                placeholder="http://127.0.0.1:3000"
+                value={tempApiUrl}
+                onChange={(e) => setTempApiUrl(e.target.value)}
+              />
+              <div className="text-xs text-default-500 mt-1">
+                e.g., http://127.0.0.1:3000 for local dev, empty for production
+              </div>
+            </TextField>
+            <div className="flex gap-2">
+              <Button size="sm" onPress={handleSaveApiUrl}>Save URL</Button>
+              <Button size="sm" variant="ghost" onPress={resetApiUrl}>Discard</Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-16">

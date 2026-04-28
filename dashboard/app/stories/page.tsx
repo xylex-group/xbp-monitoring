@@ -25,7 +25,7 @@ export default function StoriesPage() {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/stories");
+      const res = await fetch("/api/stories");
       if (!res.ok) throw new Error(await res.text());
       setStories(await res.json());
     } catch (err) {
@@ -44,7 +44,7 @@ export default function StoriesPage() {
   async function handleTrigger(name: string) {
     setTriggering(name);
     try {
-      await fetch(`/stories/${encodeURIComponent(name)}/trigger`);
+      await fetch(`/api/stories/${encodeURIComponent(name)}/trigger`);
       toast(`"${name}" triggered`, { variant: "success" });
       setTimeout(load, 2000);
     } catch (err) {
