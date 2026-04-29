@@ -1,7 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, Chip, Spinner } from "@heroui/react";
+import {
+  Button,
+  Chip,
+  Label,
+  Meter,
+  ProgressBar,
+  ProgressCircle,
+  Spinner,
+} from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useRouter } from "next/navigation";
 import { listProbeStatuses, getProbeResults, listProbes } from "@/lib/api";
@@ -141,6 +149,18 @@ export default function DashboardPage() {
   const healthPct =
     stats.total > 0 ? Math.round((stats.ok / stats.total) * 100) : 100;
 
+  const distribution = useMemo(() => {
+    if (stats.total === 0) {
+      return { ok: 0, failing: 0, pending: 0 };
+    }
+
+    return {
+      ok: Math.round((stats.ok / stats.total) * 100),
+      failing: Math.round((stats.failing / stats.total) * 100),
+      pending: Math.round((stats.pending / stats.total) * 100),
+    };
+  }, [stats.total, stats.ok, stats.failing, stats.pending]);
+
   const probeByName = useMemo(
     () => Object.fromEntries(probes.map((probe) => [probe.name, probe])),
     [probes],
@@ -271,6 +291,71 @@ export default function DashboardPage() {
                   <p className="mt-1 text-xs text-default-500">{delta}</p>
                 </div>
               ))}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
+                <h2 className="text-sm font-semibold text-default-900">Health ring</h2>
+                <p className="mt-1 text-xs text-default-500">Overall uptime across monitors</p>
+
+                <div className="mt-4 flex items-center justify-center">
+                  <div className="relative">
+                    <ProgressCircle
+                      aria-label="Overall health"
+                      value={healthPct}
+                      color={healthPct >= 90 ? "success" : healthPct >= 70 ? "warning" : "danger"}
+                      size="lg"
+                    >
+                      <ProgressCircle.Track>
+                        <ProgressCircle.TrackCircle />
+                        <ProgressCircle.FillCircle />
+                      </ProgressCircle.Track>
+                    </ProgressCircle>
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <span className="text-base font-semibold text-default-900 tabular-nums">
+                        {healthPct}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm lg:col-span-2">
+                <h2 className="text-sm font-semibold text-default-900">Status distribution</h2>
+                <p className="mt-1 text-xs text-default-500">Healthy vs failing vs pending monitors</p>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <ProgressBar aria-label="Healthy" className="w-full" color="success" value={distribution.ok}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <Label>Healthy</Label>
+                      <ProgressBar.Output />
+                    </div>
+                    <ProgressBar.Track>
+                      <ProgressBar.Fill />
+                    </ProgressBar.Track>
+                  </ProgressBar>
+
+                  <ProgressBar aria-label="Failing" className="w-full" color="danger" value={distribution.failing}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <Label>Failing</Label>
+                      <ProgressBar.Output />
+                    </div>
+                    <ProgressBar.Track>
+                      <ProgressBar.Fill />
+                    </ProgressBar.Track>
+                  </ProgressBar>
+
+                  <Meter aria-label="Pending" className="w-full" color="warning" value={distribution.pending}>
+                    <div className="mb-1 flex items-center justify-between text-xs">
+                      <Label>Pending</Label>
+                      <Meter.Output />
+                    </div>
+                    <Meter.Track>
+                      <Meter.Fill />
+                    </Meter.Track>
+                  </Meter>
+                </div>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
