@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Chip, Spinner, Table } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { listStories, triggerStory } from "@/lib/api";
 import type { StoryStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
+import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
 import { STATUS_COLOR, relativeTimeLabel } from "@/lib/monitoring-ui";
 
 export default function StoriesPage() {
@@ -26,18 +27,14 @@ export default function StoriesPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 30_000);
-    return () => clearInterval(interval);
-  }, [load]);
+  const { reload } = usePollingLoader(load);
 
   async function handleTrigger(name: string) {
     setTriggering(name);
     try {
       await triggerStory(name);
       toast(`"${name}" triggered`, { variant: "success" });
-      setTimeout(load, 2000);
+      setTimeout(reload, 2000);
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {

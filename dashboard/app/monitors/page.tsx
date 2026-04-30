@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -15,6 +15,7 @@ import type { Probe, ProbeStatus } from "@/lib/types";
 import { MonitorForm } from "@/components/MonitorForm";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
+import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
 import {
   STATUS_COLOR,
   buildStatusMap,
@@ -48,18 +49,14 @@ export default function MonitorsPage() {
     }
   }, [toast]);
 
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 30_000);
-    return () => clearInterval(interval);
-  }, [load]);
+  const { reload } = usePollingLoader(load);
 
   async function handleDelete(name: string) {
     if (!confirm(`Delete monitor "${name}"?`)) return;
     try {
       await deleteProbe(name);
       toast(`Deleted "${name}"`, { variant: "success" });
-      load();
+      reload();
     } catch (err) {
       toast(String(err), { variant: "danger" });
     }
@@ -70,7 +67,7 @@ export default function MonitorsPage() {
     try {
       await triggerProbe(name);
       toast(`"${name}" triggered`, { variant: "success" });
-      setTimeout(load, 2000);
+      setTimeout(reload, 2000);
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {

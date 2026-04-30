@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Button,
   Chip,
@@ -16,6 +16,7 @@ import { listProbeStatuses, getProbeResults, listProbes } from "@/lib/api";
 import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
+import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
 import {
   STATUS_STYLES,
   buildNamedEntityMap,
@@ -36,7 +37,6 @@ interface RunResultItem {
 }
 
 export default function DashboardPage() {
-  const LOAD_MIN_INTERVAL_MS = 2_500;
   const router = useRouter();
   const { toast } = useToast();
   const [statuses, setStatuses] = useState<ProbeStatus[]>([]);
@@ -46,16 +46,12 @@ export default function DashboardPage() {
   const [resultsProbe, setResultsProbe] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const loadingRef = useRef(false);
-  const lastLoadAtRef = useRef(0);
 
   const load = useCallback(
-    async (force = false) => {
-      const now = Date.now();
+    async () => {
       if (loadingRef.current) return;
-      if (!force && now - lastLoadAtRef.current < LOAD_MIN_INTERVAL_MS) return;
 
       loadingRef.current = true;
-      lastLoadAtRef.current = now;
 
       try {
         const [probeStatuses, probeList] = await Promise.all([
@@ -94,13 +90,7 @@ export default function DashboardPage() {
     [toast],
   );
 
-  useEffect(() => {
-    load(true);
-    const id = setInterval(() => {
-      void load(false);
-    }, 30_000);
-    return () => clearInterval(id);
-  }, [load]);
+  const { reload } = usePollingLoader(load, { minIntervalMs: 2_500 });
 
   const stats = useMemo(() => countMonitorStatuses(statuses), [statuses]);
 
@@ -156,7 +146,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onPress={() => load(true)}>
+              <Button variant="ghost" size="sm" onPress={reload}>
                 <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
                 Refresh
               </Button>
