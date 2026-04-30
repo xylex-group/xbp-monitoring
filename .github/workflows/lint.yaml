@@ -1,20 +1,43 @@
 on:
   push:
+    branches:
+      - main
+      - release
+  pull_request:
 
 name: Lint
 
 jobs:
-  clippy:
+  rust-quality:
     runs-on: ubuntu-latest
-    name: Clippy
+    name: Rust fmt + clippy
     steps:
       - uses: actions/checkout@v4
-      - name: Clippy
-        run: cargo clippy --all-targets --all-features
-  fmt:
-    name: Fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Fmt
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Check formatting
         run: cargo fmt --all -- --check
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  dashboard-typecheck:
+    name: Dashboard typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            dashboard/pnpm-lock.yaml
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dashboard dependencies
+        run: pnpm --dir dashboard install --frozen-lockfile
+      - name: Run dashboard typecheck
+        run: pnpm --dir dashboard run typecheck

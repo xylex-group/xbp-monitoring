@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release
   pull_request:
 
 env:
@@ -11,10 +12,29 @@ env:
 
 jobs:
   build_and_test:
-    name: Rust project - latest
+    name: Build and test backend + dashboard
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: rustup update stable && rustup default stable
-      - run: cargo build --verbose
-      # - run: cargo test --verbose
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            dashboard/pnpm-lock.yaml
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dashboard dependencies
+        run: pnpm --dir dashboard install --frozen-lockfile
+      - name: Build Rust backend
+        run: cargo build --verbose
+      - name: Run Rust tests
+        run: cargo test --verbose
+      - name: Build dashboard
+        run: pnpm --dir dashboard run build

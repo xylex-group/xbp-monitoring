@@ -7,14 +7,18 @@ on:
   push:
     tags:
       - v[0-9]+.*
+  workflow_dispatch:
 
 jobs:
   create-release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # v1 tag as of 2024-06-13
-      - uses: taiki-e/create-gh-release-action@72d65cee1f8033ef0c8b5d79eaf0c45c7c578ce3
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
         with:
-          # (required) GitHub token for creating GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
+          generate_release_notes: true
+          files: |
+            openapi.yaml
+            CHANGELOG.md

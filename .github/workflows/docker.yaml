@@ -6,19 +6,31 @@ on:
   push:
     branches:
       - release
+    tags:
+      - v*
+  workflow_dispatch:
 
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAMESPACE: ${{ github.repository }}
 
 # There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    outputs:
-      digest: ${{ steps.push.outputs.digest }}
-      image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: .
+            dockerfile: Dockerfile.backend
+            image_suffix: backend
+          - name: dashboard
+            context: ./dashboard
+            dockerfile: Dockerfile
+            image_suffix: dashboard
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
       contents: read
@@ -41,9 +53,11 @@ jobs:
         id: meta
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.image_suffix }}
           tags: |
             type=ref,event=branch
+            type=ref,event=tag
+            type=sha
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/release' }}
       # These two steps configure multi-platform building
       - name: Set up QEMU
@@ -58,26 +72,31 @@ jobs:
         id: push
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
-          context: .
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Output image digest
         run: |
           echo "## Docker image" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}`" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** `${{ matrix.name }}`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** `${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.image_suffix }}`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Digest:** `${{ steps.push.outputs.digest }}`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Pull (by digest):** `docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.push.outputs.digest }}`" >> $GITHUB_STEP_SUMMARY
+          echo "**Pull (by digest):** `docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.image_suffix }}@${{ steps.push.outputs.digest }}`" >> $GITHUB_STEP_SUMMARY
 
       # This step generates an artifact attestation for the image, which is an unforgeable statement about where and how it was built. It increases supply chain security for people who consume the image. For more information, see "[AUTOTITLE](/actions/security-guides/using-artifact-attestations-to-establish-provenance-for-builds)."
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME}}
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}-${{ matrix.image_suffix }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true

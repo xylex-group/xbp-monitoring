@@ -273,14 +273,21 @@ The root `package.json` includes convenience commands for dashboard work. Additi
 
 GitHub Actions workflows are included for:
 
-- linting
-- build verification
-- release creation
-- Docker image publishing
+- Rust formatting and clippy validation
+- dashboard TypeScript validation
+- backend build and test verification
+- dashboard production build verification
+- GitHub release creation for version tags
+- Docker image publishing for both backend and dashboard images
 
 Current workflow files live under `.github/workflows/`.
 
 Release notes and unreleased changes can be tracked in `CHANGELOG.md`.
+
+Published container targets are designed around the two shipped deployables:
+
+- backend image: `ghcr.io/<owner>/<repo>-backend`
+- dashboard image: `ghcr.io/<owner>/<repo>-dashboard`
 
 ## Docs and project conventions
 
