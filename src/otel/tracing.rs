@@ -3,6 +3,8 @@ use std::env;
 use opentelemetry::global;
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
 use opentelemetry_sdk::propagation::TraceContextPropagator;
+use tracing_loki::Layer as LokiLayer;
+use url::Url;
 
 use chrono::Utc;
 use opentelemetry_sdk::trace::{BatchSpanProcessor, SdkTracerProvider};
@@ -86,4 +88,56 @@ pub fn create_tracer() {
         serde_json::json!({ "has_traces": true }),
     );
     // #endregion
+}
+
+pub fn loki_from_env() -> Option<(LokiLayer, tracing_loki::BackgroundTask)> {
+    let enabled = env::var("XBP_LOKI_ENABLED")
+        .ok()
+        .map(|v| v.eq_ignore_ascii_case("1") || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+
+    if !enabled {
+        return None;
+    }
+
+    let loki_url = env::var("XBP_LOKI_URL").unwrap_or_else(|_| "http://localhost:3100".into());
+    let parsed_url = match Url::parse(&loki_url) {
+        Ok(url) => url,
+        Err(err) => {
+            eprintln!("Invalid XBP_LOKI_URL '{}': {}", loki_url, err);
+            return None;
+        }
+    };
+
+    let mut builder = tracing_loki::builder()
+        .label("service", "xbp-monitoring")
+        .expect("static service label should be valid");
+
+    if let Ok(job) = env::var("XBP_LOKI_JOB") {
+        builder = match builder.label("job", job) {
+            Ok(next) => next,
+            Err(err) => {
+                eprintln!("Failed to add Loki job label: {}", err);
+                return None;
+            }
+        };
+    }
+
+    if let Ok(environment) = env::var("XBP_LOKI_ENV") {
+        builder = match builder.label("env", environment) {
+            Ok(next) => next,
+            Err(err) => {
+                eprintln!("Failed to add Loki env label: {}", err);
+                return None;
+            }
+        };
+    }
+
+    match builder.build_url(parsed_url) {
+        Ok((layer, task)) => Some((layer, task)),
+        Err(err) => {
+            eprintln!("Failed to initialize Loki layer: {}", err);
+            None
+        }
+    }
 }

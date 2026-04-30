@@ -7,6 +7,7 @@ import { Icon } from "@iconify/react";
 import { getProbeResults, listProbes, listProbeStatuses, triggerProbe } from "@/lib/api";
 import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
+import { ResponseBodyView } from "@/components/ResponseBodyView";
 
 function MonitorDetailContent() {
   const router = useRouter();
@@ -74,7 +75,7 @@ function MonitorDetailContent() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-2xl border border-default-200 bg-white p-5 shadow-sm dark:bg-black">
+      <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="mb-1 flex items-center gap-2 text-xs text-default-500">
@@ -125,17 +126,17 @@ function MonitorDetailContent() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24 dark:bg-black">
+        <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
           <Spinner size="lg" />
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-2xl border border-default-200 bg-white p-8 text-center text-default-500 shadow-sm dark:bg-black">
+        <div className="rounded-2xl border border-default-200 bg-content1 p-8 text-center text-default-500 shadow-sm">
           No run history found for this monitor.
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           {results.map((result, idx) => (
-            <div key={`${result.timestamp_started}-${idx}`} className="rounded-xl border border-default-200 bg-white p-4 shadow-sm dark:bg-black">
+            <div key={`${result.timestamp_started}-${idx}`} className="rounded-xl border border-default-200 bg-content1 p-4 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Chip size="sm" variant="soft" color={result.success ? "success" : "danger"}>
@@ -154,9 +155,7 @@ function MonitorDetailContent() {
                 result.response.sensitive ? (
                   <p className="text-xs italic text-default-500">[Response body redacted — sensitive]</p>
                 ) : result.response.body ? (
-                  <pre className="max-h-52 overflow-auto rounded-lg bg-default-50 p-3 text-xs whitespace-pre-wrap dark:bg-default-100/10">
-                    {result.response.body}
-                  </pre>
+                  <ResponseBodyView body={result.response.body} />
                 ) : (
                   <p className="text-xs text-default-500">No response body</p>
                 )
@@ -179,7 +178,7 @@ export default function MonitorDetailPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex justify-center rounded-2xl border border-default-200 bg-white py-24 dark:bg-black">
+        <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
           <Spinner size="lg" />
         </div>
       }

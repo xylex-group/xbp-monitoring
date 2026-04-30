@@ -4,7 +4,6 @@ use axum::{
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::IntoResponse,
 };
-use serde_yaml;
 use std::sync::Arc;
 use tokio::fs;
 use tracing::{debug, error, info};

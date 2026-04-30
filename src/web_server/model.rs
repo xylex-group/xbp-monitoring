@@ -12,3 +12,16 @@ pub struct ProbeResponse {
     pub status: String,
     pub last_probed: Option<DateTime<Utc>>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TelemetryStatusResponse {
+    pub metrics_exporter: String,
+    pub prometheus_enabled: bool,
+    pub prometheus_main_endpoint: Option<String>,
+    pub prometheus_dedicated_endpoint: Option<String>,
+    pub traces_exporter: String,
+    pub loki_enabled: bool,
+    pub loki_url: Option<String>,
+    pub loki_job: Option<String>,
+    pub loki_env: Option<String>,
+}

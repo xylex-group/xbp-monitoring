@@ -10,6 +10,7 @@ use clap::Parser;
 use probe::schedule::schedule_probes;
 use probe::schedule::schedule_stories;
 use std::{path::PathBuf, sync::Arc};
+use tracing::warn;
 use web_server::start_axum_server;
 use web_server::start_prometheus_server;
 
@@ -29,18 +30,25 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Args = Args::parse();
     let otel_state: otel::OtelGuard = otel::init();
+    let prometheus_registry = otel_state.metrics.registry.clone();
     if let Some(registry) = &otel_state.metrics.registry {
-        tokio::spawn(start_prometheus_server(registry.clone()));
+        let registry = registry.clone();
+        tokio::spawn(async move {
+            start_prometheus_server(registry).await;
+        });
+    } else {
+        warn!("Prometheus metrics exporter not enabled; /metrics will return 503");
     }
 
     let config_path = PathBuf::from(&args.file);
     let config: config::Config = load_config(config_path.clone()).await?;
 
-    let app_state: Arc<AppState> = Arc::new(AppState::new(config, config_path));
+    let app_state: Arc<AppState> =
+        Arc::new(AppState::new(config, config_path, prometheus_registry));
 
     start_monitoring(app_state.clone()).await?;
 
-    start_axum_server(app_state.clone()).await;
+    start_axum_server(app_state.clone()).await?;
 
     Ok(())
 }

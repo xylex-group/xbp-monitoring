@@ -75,11 +75,23 @@ Copy `.env.example` to `.env` and configure as needed:
   - Host for Prometheus metrics endpoint (only used when `OTEL_METRICS_EXPORTER=prometheus`)
 
 - **`OTEL_EXPORTER_PROMETHEUS_PORT`** (default: `9464`)
-  - Port for Prometheus metrics endpoint (only used when `OTEL_METRICS_EXPORTER=prometheus`)
+  - Port for dedicated Prometheus metrics listener (only used when `OTEL_METRICS_EXPORTER=prometheus`)
 
 - **`OTEL_RESOURCE_ATTRIBUTES`** (optional)
   - Standard OpenTelemetry resource attributes
   - Example: `service.name=xbp-monitoring,service.version=1.0.0`
+
+- **`XBP_LOKI_ENABLED`** (optional, default: `false`)
+  - Set to `true` or `1` to push logs to Loki via tracing subscriber.
+
+- **`XBP_LOKI_URL`** (optional, default: `http://localhost:3100`)
+  - Loki base URL used for log ingestion.
+
+- **`XBP_LOKI_JOB`** (optional, default: unset)
+  - Adds `job` label to Loki streams.
+
+- **`XBP_LOKI_ENV`** (optional, default: unset)
+  - Adds `env` label to Loki streams.
 
 #### Custom Environment Variables
 
@@ -219,8 +231,14 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
   - Set `OTEL_TRACES_EXPORTER=stdout` to print spans to stdout locally.
 - Metrics (Prometheus):
   - Set `OTEL_METRICS_EXPORTER=prometheus`.
-  - Server binds using `OTEL_EXPORTER_PROMETHEUS_HOST` (default `localhost`) and `OTEL_EXPORTER_PROMETHEUS_PORT` (default `9464`).
-  - Scrape path is `/metrics`.
+  - Main API server exposes `/metrics` on port `3000`.
+  - Dedicated listener also binds using `OTEL_EXPORTER_PROMETHEUS_HOST` (default `localhost`) and `OTEL_EXPORTER_PROMETHEUS_PORT` (default `9464`).
+  - Scrape path is `/metrics` on both endpoints.
+
+- Loki logs (optional):
+  - Set `XBP_LOKI_ENABLED=true`.
+  - Configure `XBP_LOKI_URL` (default `http://localhost:3100`).
+  - Optionally add `XBP_LOKI_JOB` and `XBP_LOKI_ENV` labels.
 
 ## HTTP clients (reuse only)
 
@@ -245,7 +263,9 @@ See `.env.example.github` for detailed documentation of all GitHub workflow envi
 - `/stories`
 - `/stories/:name/results`
 - `/stories/:name/trigger`
-- `/metrics` (only when Prometheus metrics are enabled)
+- `/api/telemetry` (runtime telemetry status: OTEL exporters, Prometheus availability, Loki config)
+- `/metrics` (on the main API server when `OTEL_METRICS_EXPORTER=prometheus`; otherwise returns 503)
+- Dedicated `/metrics` listener on `OTEL_EXPORTER_PROMETHEUS_HOST:OTEL_EXPORTER_PROMETHEUS_PORT` when Prometheus is enabled
 
 ## Config entry points
 
