@@ -1,5 +1,7 @@
 use axum::{
     extract::{Path, Query},
+    http::StatusCode,
+    response::IntoResponse,
     Extension, Json,
 };
 use std::sync::Arc;
@@ -66,15 +68,35 @@ pub async fn probes(Extension(state): Extension<Arc<AppState>>) -> Json<Vec<Prob
 pub async fn probe_trigger(
     Path(name): Path<String>,
     Extension(state): Extension<Arc<AppState>>,
-) -> Json<ProbeResult> {
+) -> impl IntoResponse {
     debug!("Probe trigger called");
 
-    let probe = &state.config.probes.iter().find(|x| x.name == name).unwrap();
+    let Some(probe) = state.config.probes.iter().find(|x| x.name == name) else {
+        return (
+            StatusCode::NOT_FOUND,
+            format!("Probe '{}' not found", name),
+        )
+            .into_response();
+    };
 
     probe.probe_and_store_result(state.clone()).await;
 
     let lock = state.probe_results.read().unwrap();
-    let probe_results = lock.get(&name).unwrap();
+    let Some(probe_results) = lock.get(&name) else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Probe '{}' did not store a result", name),
+        )
+            .into_response();
+    };
 
-    Json(probe_results.last().unwrap().clone())
+    let Some(last_result) = probe_results.last() else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Probe '{}' has no stored results", name),
+        )
+            .into_response();
+    };
+
+    Json(last_result.clone()).into_response()
 }

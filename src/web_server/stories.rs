@@ -1,5 +1,7 @@
 use axum::{
     extract::{Path, Query},
+    http::StatusCode,
+    response::IntoResponse,
     Extension, Json,
 };
 use std::sync::Arc;
@@ -71,20 +73,40 @@ pub async fn stories(Extension(state): Extension<Arc<AppState>>) -> Json<Vec<Pro
 pub async fn story_trigger(
     Path(name): Path<String>,
     Extension(state): Extension<Arc<AppState>>,
-) -> Json<StoryResult> {
+) -> impl IntoResponse {
     debug!("Story trigger called");
 
-    let story = &state
+    let Some(story) = state
         .config
         .stories
         .iter()
         .find(|x| x.name == name)
-        .unwrap();
+    else {
+        return (
+            StatusCode::NOT_FOUND,
+            format!("Story '{}' not found", name),
+        )
+            .into_response();
+    };
 
     story.probe_and_store_result(state.clone()).await;
 
     let lock = state.story_results.read().unwrap();
-    let story_results = lock.get(&name).unwrap();
+    let Some(story_results) = lock.get(&name) else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Story '{}' did not store a result", name),
+        )
+            .into_response();
+    };
 
-    Json(story_results.last().unwrap().clone())
+    let Some(last_result) = story_results.last() else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Story '{}' has no stored results", name),
+        )
+            .into_response();
+    };
+
+    Json(last_result.clone()).into_response()
 }

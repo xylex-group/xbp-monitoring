@@ -23,3 +23,15 @@ probes:
         value: '200'
     alerts: []
     sensitive: false
+  - name: studio.athena-cluster.com
+    url: https://studio.athena-cluster.com
+    http_method: GET
+    schedule:
+      initial_delay: 0
+      interval: 60
+    expectations:
+      - field: StatusCode
+        operation: Equals
+        value: '200'
+    alerts: []
+    sensitive: false
