@@ -27,3 +27,4 @@ target
 .env
 gais.json
 dashboard/out
+workflows.json

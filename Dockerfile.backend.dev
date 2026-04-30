@@ -1,0 +1,12 @@
+FROM rust:1-bookworm
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && cargo install cargo-watch --locked
+
+EXPOSE 3000 9464
+
+CMD ["cargo", "watch", "-x", "run -- --file /app/xbp.yml"]

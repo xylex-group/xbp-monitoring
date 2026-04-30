@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const isDev = process.env.NODE_ENV === "development";
+const backendBaseUrl = process.env.BACKEND_BASE_URL ?? "http://127.0.0.1:3000";
 
 const nextConfig = {
   output: "export",
@@ -13,17 +14,17 @@ const nextConfig = {
           return [
             {
               source: "/api/probes/:path*",
-              destination: "http://127.0.0.1:3000/probes/:path*",
+              destination: `${backendBaseUrl}/probes/:path*`,
               basePath: false,
             },
             {
               source: "/api/stories/:path*",
-              destination: "http://127.0.0.1:3000/stories/:path*",
+              destination: `${backendBaseUrl}/stories/:path*`,
               basePath: false,
             },
             {
               source: "/api/:path*",
-              destination: "http://127.0.0.1:3000/api/:path*",
+              destination: `${backendBaseUrl}/api/:path*`,
               basePath: false,
             },
           ];

@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: xbp-monitoring-backend
+    ports:
+      - "3000:3000"
+      - "9464:9464"
+    env_file:
+      - .env
+    volumes:
+      - ./xbp.yml:/app/xbp.yml:ro
+    restart: unless-stopped
+
+  app:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: xbp-monitoring-app
+    depends_on:
+      - backend
+    ports:
+      - "3001:80"
+    restart: unless-stopped

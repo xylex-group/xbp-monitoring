@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.dev
+    command: cargo watch -x "run -- --file /app/xbp.yml"
+    volumes:
+      - ./:/app
+      - backend_target:/app/target
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+
+  app:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile.dev
+    environment:
+      NODE_ENV: development
+      BACKEND_BASE_URL: http://backend:3000
+    command: pnpm dev --hostname 0.0.0.0 -p 80
+    volumes:
+      - ./dashboard:/app
+      - dashboard_node_modules:/app/node_modules
+
+volumes:
+  backend_target:
+  cargo_registry:
+  cargo_git:
+  dashboard_node_modules:
