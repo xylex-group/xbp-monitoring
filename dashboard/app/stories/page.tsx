@@ -7,12 +7,7 @@ import { Icon } from "@iconify/react";
 import { listStories, triggerStory } from "@/lib/api";
 import type { StoryStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
-
-const STATUS_COLOR = {
-  OK: "success",
-  FAILING: "danger",
-  PENDING: "warning",
-} as const;
+import { STATUS_COLOR, relativeTimeLabel } from "@/lib/monitoring-ui";
 
 export default function StoriesPage() {
   const router = useRouter();
@@ -81,14 +76,14 @@ export default function StoriesPage() {
                       <Chip
                         size="sm"
                         variant="soft"
-                        color={STATUS_COLOR[story.status as keyof typeof STATUS_COLOR] ?? "default"}
+                        color={STATUS_COLOR[story.status]}
                       >
                         {story.status}
                       </Chip>
                     </Table.Cell>
                     <Table.Cell className="text-xs text-muted">
                       {story.last_probed
-                        ? new Date(story.last_probed).toLocaleString()
+                        ? `${new Date(story.last_probed).toLocaleString()} (${relativeTimeLabel(story.last_probed)})`
                         : "Never"}
                     </Table.Cell>
                     <Table.Cell>

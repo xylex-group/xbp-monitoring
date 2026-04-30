@@ -16,12 +16,12 @@ import { listProbeStatuses, getProbeResults, listProbes } from "@/lib/api";
 import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
-
-const STATUS_ICON = {
-  OK: "gravity-ui:circle-check-fill",
-  FAILING: "gravity-ui:circle-xmark-fill",
-  PENDING: "gravity-ui:circle-dashed",
-} as const;
+import {
+  STATUS_STYLES,
+  buildNamedEntityMap,
+  countMonitorStatuses,
+  relativeTimeLabel,
+} from "@/lib/monitoring-ui";
 
 interface RecentResult {
   probeName: string;
@@ -33,43 +33,6 @@ interface RunResultItem {
   endpoint: string;
   status: ProbeStatus["status"];
   timeLabel: string;
-}
-
-const STATUS_STYLES = {
-  OK: {
-    iconClass: "text-success",
-    chipColor: "success" as const,
-    toneClass: "bg-success/10 border-success/30",
-    dotClass: "bg-success",
-  },
-  FAILING: {
-    iconClass: "text-danger",
-    chipColor: "danger" as const,
-    toneClass: "bg-danger/10 border-danger/30",
-    dotClass: "bg-danger",
-  },
-  PENDING: {
-    iconClass: "text-warning",
-    chipColor: "warning" as const,
-    toneClass: "bg-warning/10 border-warning/30",
-    dotClass: "bg-warning",
-  },
-};
-
-function relativeTimeLabel(value: string | null): string {
-  if (!value) return "never";
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "unknown";
-  const diffMs = Date.now() - parsed.getTime();
-  if (diffMs < 60_000) return "just now";
-  const diffMins = Math.floor(diffMs / 60_000);
-  if (diffMins < 60)
-    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24)
-    return `about ${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
 
 export default function DashboardPage() {
@@ -139,12 +102,7 @@ export default function DashboardPage() {
     return () => clearInterval(id);
   }, [load]);
 
-  const stats = useMemo(() => {
-    const ok = statuses.filter((s) => s.status === "OK").length;
-    const failing = statuses.filter((s) => s.status === "FAILING").length;
-    const pending = statuses.filter((s) => s.status === "PENDING").length;
-    return { total: statuses.length, ok, failing, pending };
-  }, [statuses]);
+  const stats = useMemo(() => countMonitorStatuses(statuses), [statuses]);
 
   const healthPct =
     stats.total > 0 ? Math.round((stats.ok / stats.total) * 100) : 100;
@@ -161,10 +119,7 @@ export default function DashboardPage() {
     };
   }, [stats.total, stats.ok, stats.failing, stats.pending]);
 
-  const probeByName = useMemo(
-    () => Object.fromEntries(probes.map((probe) => [probe.name, probe])),
-    [probes],
-  );
+  const probeByName = useMemo(() => buildNamedEntityMap(probes), [probes]);
 
   const runResults = useMemo<RunResultItem[]>(() => {
     return statuses.slice(0, 12).map((status) => ({

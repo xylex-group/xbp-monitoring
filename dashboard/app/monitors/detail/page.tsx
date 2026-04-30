@@ -2,10 +2,11 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Button, Chip, Spinner } from "@heroui/react";
-import { Icon } from "@iconify/react";
+import { Chip, Spinner } from "@heroui/react";
 import { getProbeResults, listProbes, listProbeStatuses, triggerProbe } from "@/lib/api";
 import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
+import { EntityDetailHeader } from "@/components/EntityDetailHeader";
+import { RunSummaryGrid } from "@/components/RunSummaryGrid";
 import { useToast } from "@/components/ToastProvider";
 import { ResponseBodyView } from "@/components/ResponseBodyView";
 
@@ -75,55 +76,23 @@ function MonitorDetailContent() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="rounded-2xl border border-default-200 bg-content1 p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="mb-1 flex items-center gap-2 text-xs text-default-500">
-              <button type="button" className="hover:text-default-700" onClick={() => router.push("/monitors")}>
-                Monitors
-              </button>
-              <span>/</span>
-              <span className="font-semibold text-default-700">Detail</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-default-900">{monitorName || "Monitor detail"}</h1>
-            {probe?.url && <p className="mt-1 text-xs text-default-500">{probe.url}</p>}
-          </div>
+      <EntityDetailHeader
+        backLabel="Monitors"
+        title={monitorName || "Monitor detail"}
+        subtitle={probe?.url}
+        loading={loading}
+        triggering={triggering}
+        onBack={() => router.push("/monitors")}
+        onRefresh={() => void load()}
+        onTrigger={() => void handleTrigger()}
+      />
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" onPress={() => router.push("/monitors")}>
-              <Icon icon="gravity-ui:arrow-left" className="size-4" />
-              Back
-            </Button>
-            <Button variant="ghost" onPress={() => void load()} isPending={loading}>
-              <Icon icon="gravity-ui:arrow-rotate-right" className="size-4" />
-              Refresh
-            </Button>
-            <Button variant="primary" onPress={handleTrigger} isPending={triggering}>
-              <Icon icon="gravity-ui:play" className="size-4" />
-              Trigger
-            </Button>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 md:max-w-2xl md:grid-cols-4">
-          <div className="rounded-xl border border-default-200 bg-default-50 p-3">
-            <p className="text-xs text-default-500">Current status</p>
-            <p className="text-lg font-bold text-default-900">{status?.status ?? "PENDING"}</p>
-          </div>
-          <div className="rounded-xl border border-default-200 bg-default-50 p-3">
-            <p className="text-xs text-default-500">Runs loaded</p>
-            <p className="text-lg font-bold text-default-900">{summary.total}</p>
-          </div>
-          <div className="rounded-xl border border-default-200 bg-success/5 p-3">
-            <p className="text-xs text-default-500">Passed</p>
-            <p className="text-lg font-bold text-success">{summary.success}</p>
-          </div>
-          <div className="rounded-xl border border-default-200 bg-danger/5 p-3">
-            <p className="text-xs text-default-500">Failed</p>
-            <p className="text-lg font-bold text-danger">{summary.failed}</p>
-          </div>
-        </div>
-      </div>
+      <RunSummaryGrid
+        currentStatus={status?.status}
+        total={summary.total}
+        success={summary.success}
+        failed={summary.failed}
+      />
 
       {loading ? (
         <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">

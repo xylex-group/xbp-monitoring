@@ -15,12 +15,12 @@ import type { Probe, ProbeStatus } from "@/lib/types";
 import { MonitorForm } from "@/components/MonitorForm";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
-
-const STATUS_COLOR = {
-  OK: "success",
-  FAILING: "danger",
-  PENDING: "warning",
-} as const;
+import {
+  STATUS_COLOR,
+  buildStatusMap,
+  countMonitorStatuses,
+  relativeTimeLabel,
+} from "@/lib/monitoring-ui";
 
 export default function MonitorsPage() {
   const router = useRouter();
@@ -40,9 +40,7 @@ export default function MonitorsPage() {
         listProbeStatuses(),
       ]);
       setProbes(probeList);
-      const statusMap: Record<string, ProbeStatus> = {};
-      for (const s of statusList) statusMap[s.name] = s;
-      setStatuses(statusMap);
+      setStatuses(buildStatusMap(statusList));
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {
@@ -80,14 +78,7 @@ export default function MonitorsPage() {
     }
   }
 
-  const stats = useMemo(() => {
-    const values = Object.values(statuses);
-    return {
-      ok: values.filter((s) => s.status === "OK").length,
-      failing: values.filter((s) => s.status === "FAILING").length,
-      pending: values.filter((s) => s.status === "PENDING").length,
-    };
-  }, [statuses]);
+  const stats = useMemo(() => countMonitorStatuses(Object.values(statuses)), [statuses]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -180,7 +171,7 @@ export default function MonitorsPage() {
                       </Table.Cell>
                       <Table.Cell className="text-xs text-muted">
                         {status?.last_probed
-                          ? new Date(status.last_probed).toLocaleString()
+                          ? `${new Date(status.last_probed).toLocaleString()} (${relativeTimeLabel(status.last_probed)})`
                           : "Never"}
                       </Table.Cell>
                       <Table.Cell>
