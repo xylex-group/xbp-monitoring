@@ -18,21 +18,21 @@ import { createProbe, updateProbe } from "@/lib/api";
 import type {
   ExpectField,
   ExpectOperation,
+  HttpMethod,
   Probe,
   ProbeExpectation,
 } from "@/lib/types";
+import { EXPECT_FIELDS, EXPECT_OPERATIONS, HTTP_METHODS } from "@/lib/types";
 import { useToast } from "./ToastProvider";
 
-const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"];
-const EXPECT_FIELDS: ExpectField[] = ["StatusCode", "Body"];
-const EXPECT_OPS: ExpectOperation[] = [
-  "Equals",
-  "NotEquals",
-  "Contains",
-  "NotContains",
-  "Matches",
-  "IsOneOf",
-];
+type SelectionValue = string | number | null;
+
+function isOneOf<const Values extends readonly string[]>(
+  values: Values,
+  candidate: string
+): candidate is Values[number] {
+  return (values as readonly string[]).includes(candidate);
+}
 
 interface Props {
   probe?: Probe;
@@ -74,6 +74,31 @@ export function MonitorForm({ probe: initial, onSuccess, onCancel }: Props) {
   function set<K extends keyof Probe>(key: K, value: Probe[K]) {
     setProbe((prev) => ({ ...prev, [key]: value }));
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
+  }
+
+  function parseSelection(selection: SelectionValue): string | null {
+    return selection == null ? null : String(selection);
+  }
+
+  function setHttpMethod(selection: SelectionValue) {
+    const candidate = parseSelection(selection);
+    if (candidate && isOneOf(HTTP_METHODS, candidate)) {
+      set("http_method", candidate as HttpMethod);
+    }
+  }
+
+  function setExpectationField(idx: number, selection: SelectionValue) {
+    const candidate = parseSelection(selection);
+    if (candidate && isOneOf(EXPECT_FIELDS, candidate)) {
+      updateExpectation(idx, { field: candidate as ExpectField });
+    }
+  }
+
+  function setExpectationOperation(idx: number, selection: SelectionValue) {
+    const candidate = parseSelection(selection);
+    if (candidate && isOneOf(EXPECT_OPERATIONS, candidate)) {
+      updateExpectation(idx, { operation: candidate as ExpectOperation });
+    }
   }
 
   function setSchedule(key: "initial_delay" | "interval", value: number) {
@@ -207,7 +232,7 @@ export function MonitorForm({ probe: initial, onSuccess, onCancel }: Props) {
 
           <Select
             selectedKey={probe.http_method}
-            onSelectionChange={(key) => set("http_method", String(key))}
+            onSelectionChange={setHttpMethod}
           >
             <Label>HTTP Method</Label>
             <Select.Trigger>
@@ -285,9 +310,7 @@ export function MonitorForm({ probe: initial, onSuccess, onCancel }: Props) {
           <div key={idx} className="flex items-center gap-2">
             <Select
               selectedKey={exp.field}
-              onSelectionChange={(key) =>
-                updateExpectation(idx, { field: String(key) as ExpectField })
-              }
+              onSelectionChange={(key) => setExpectationField(idx, key)}
             >
               <Label className="sr-only">Field</Label>
               <Select.Trigger className="w-36">
@@ -305,9 +328,7 @@ export function MonitorForm({ probe: initial, onSuccess, onCancel }: Props) {
 
             <Select
               selectedKey={exp.operation}
-              onSelectionChange={(key) =>
-                updateExpectation(idx, { operation: String(key) as ExpectOperation })
-              }
+              onSelectionChange={(key) => setExpectationOperation(idx, key)}
             >
               <Label className="sr-only">Operation</Label>
               <Select.Trigger className="w-40">
@@ -316,7 +337,7 @@ export function MonitorForm({ probe: initial, onSuccess, onCancel }: Props) {
               </Select.Trigger>
               <Select.Popover>
                 <ListBox>
-                  {EXPECT_OPS.map((op) => (
+                  {EXPECT_OPERATIONS.map((op) => (
                     <ListBox.Item key={op} id={op} textValue={op}>{op}</ListBox.Item>
                   ))}
                 </ListBox>

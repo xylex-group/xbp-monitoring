@@ -27,4 +27,7 @@ target
 .env
 gais.json
 dashboard/out
+dashboard/.next
+dashboard/node_modules
+node_modules
 workflows.json

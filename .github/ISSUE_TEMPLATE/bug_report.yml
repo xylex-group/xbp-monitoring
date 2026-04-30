@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem in XBP Monitoring
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail for someone else to reproduce it reliably.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: A short description of the problem
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: List the exact steps to reproduce the issue
+      placeholder: |
+        1. Start the service with ...
+        2. Open ...
+        3. Trigger ...
+        4. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include OS, Rust version, Node version, Docker version, and deployment mode if relevant
+      placeholder: |
+        - OS:
+        - Rust:
+        - Node:
+        - Docker:
+        - Deployment mode:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, screenshots, or traces
+      description: Paste any relevant logs, screenshots, metrics output, or trace IDs

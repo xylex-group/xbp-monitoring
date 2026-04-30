@@ -1,11 +1,25 @@
-export type ExpectField = "Body" | "StatusCode";
-export type ExpectOperation =
-  | "Equals"
-  | "NotEquals"
-  | "IsOneOf"
-  | "Contains"
-  | "NotContains"
-  | "Matches";
+export const EXPECT_FIELDS = ["Body", "StatusCode"] as const;
+export type ExpectField = (typeof EXPECT_FIELDS)[number];
+
+export const EXPECT_OPERATIONS = [
+  "Equals",
+  "NotEquals",
+  "IsOneOf",
+  "Contains",
+  "NotContains",
+  "Matches",
+] as const;
+export type ExpectOperation = (typeof EXPECT_OPERATIONS)[number];
+
+export const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"] as const;
+export type HttpMethod = (typeof HTTP_METHODS)[number];
+
+export const MONITOR_STATUSES = ["OK", "FAILING", "PENDING"] as const;
+export type MonitorStatus = (typeof MONITOR_STATUSES)[number];
+
+export type StringMap = Record<string, string>;
+export type NamedEntity = { name: string };
+export type NamedEntityMap<T extends NamedEntity> = Partial<Record<T["name"], T>>;
 
 export interface ProbeExpectation {
   field: ExpectField;
@@ -23,86 +37,76 @@ export interface ProbeAlert {
 }
 
 export interface ProbeInputParameters {
-  headers?: Record<string, string>;
+  headers?: StringMap;
   body?: string;
   timeout_seconds?: number;
 }
 
-export interface Probe {
-  name: string;
+export interface HttpRequestDefinition {
   url: string;
-  http_method: string;
+  http_method: HttpMethod;
   with?: ProbeInputParameters;
   expectations?: ProbeExpectation[];
-  schedule: ProbeSchedule;
-  alerts?: ProbeAlert[];
   sensitive?: boolean;
-  tags?: Record<string, string>;
 }
 
-export interface ProbeStatus {
-  name: string;
-  status: "OK" | "FAILING" | "PENDING";
+export interface SchedulableMonitor {
+  schedule: ProbeSchedule;
+  alerts?: ProbeAlert[];
+  tags?: StringMap;
+}
+
+export interface Probe extends NamedEntity, HttpRequestDefinition, SchedulableMonitor {}
+
+export interface ProbeStatus extends NamedEntity {
+  status: MonitorStatus;
   last_probed: string | null;
 }
 
-export interface ProbeResult {
+export interface HttpResponseDetails {
+  timestamp_received: string;
+  status_code: number;
+  body: string;
+  sensitive: boolean;
+}
+
+export interface TraceContext {
+  trace_id?: string;
+}
+
+export interface StepTraceContext extends TraceContext {
+  span_id?: string;
+}
+
+export interface ProbeResult extends TraceContext {
   probe_name: string;
   timestamp_started: string;
   success: boolean;
   error_message?: string;
-  trace_id?: string;
-  response?: {
-    timestamp_received: string;
-    status_code: number;
-    body: string;
-    sensitive: boolean;
-  };
+  response?: HttpResponseDetails;
 }
 
 export interface TriggerResponse {
   timestamp_started?: string;
 }
 
-export interface ApiConfig {
-  probes: Probe[];
-  stories: Story[];
+export interface StoryStep extends NamedEntity, HttpRequestDefinition {}
+
+export interface Story extends NamedEntity, SchedulableMonitor {
+  steps: StoryStep[];
 }
 
-export interface Story {
-  name: string;
-  steps: Array<{
-    name: string;
-    url: string;
-    http_method: string;
-    with?: ProbeInputParameters;
-    expectations?: ProbeExpectation[];
-    sensitive?: boolean;
-  }>;
-  schedule: ProbeSchedule;
-  alerts?: ProbeAlert[];
-  tags?: Record<string, string>;
-}
-
-export interface StoryStatus {
-  name: string;
-  status: "OK" | "FAILING" | "PENDING";
+export interface StoryStatus extends NamedEntity {
+  status: MonitorStatus;
   last_probed: string | null;
 }
 
-export interface StoryStepResult {
+export interface StoryStepResult extends StepTraceContext {
   step_name: string;
   timestamp_started: string;
   success: boolean;
   error_message?: string;
-  trace_id?: string;
-  span_id?: string;
-  response?: {
-    timestamp_received: string;
-    status_code: number;
-    body: string;
-    sensitive: boolean;
-  };
+  response?: HttpResponseDetails;
 }
 
 export interface StoryResult {
@@ -111,3 +115,11 @@ export interface StoryResult {
   success: boolean;
   step_results: StoryStepResult[];
 }
+
+export interface ApiConfig {
+  probes: Probe[];
+  stories: Story[];
+}
+
+export type ConfigCollectionKey = keyof Pick<ApiConfig, "probes" | "stories">;
+export type ConfigEntity<K extends ConfigCollectionKey> = ApiConfig[K][number];

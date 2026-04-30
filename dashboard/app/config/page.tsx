@@ -5,7 +5,7 @@ import { Button, Input, Label, TextField, Spinner } from "@heroui/react";
 import { Icon } from "@iconify/react";
 import { useApiUrl } from "@/lib/useApiUrl";
 import { useToast } from "@/components/ToastProvider";
-import { restartServer } from "@/lib/api";
+import { getRawConfig, restartServer, saveRawConfig } from "@/lib/api";
 
 export default function ConfigPage() {
   const { toast } = useToast();
@@ -18,9 +18,7 @@ export default function ConfigPage() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const res = await fetch("/api/config");
-      if (!res.ok) throw new Error(await res.text());
-      setYaml(await res.text());
+      setYaml(await getRawConfig());
     } catch (err) {
       toast(String(err), { variant: "danger" });
     } finally {
@@ -39,12 +37,7 @@ export default function ConfigPage() {
   async function handleSave() {
     setSaving(true);
     try {
-      const res = await fetch("/api/config", {
-        method: "PUT",
-        headers: { "Content-Type": "text/yaml" },
-        body: yaml,
-      });
-      if (!res.ok) throw new Error(await res.text());
+      await saveRawConfig(yaml);
       toast("Config saved. Restart to apply changes.", { variant: "success" });
     } catch (err) {
       toast(String(err), { variant: "danger" });

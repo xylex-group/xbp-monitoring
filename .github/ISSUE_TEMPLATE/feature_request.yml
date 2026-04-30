@@ -1,0 +1,40 @@
+name: Feature request
+description: Propose an enhancement or new capability
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. Clear use cases make prioritization much easier.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What problem are you trying to solve?
+      placeholder: As an operator, I want ... so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the change you would like to see
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or different approaches you already evaluated?
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and impact
+      description: Mention likely impact on config, API, dashboard, telemetry, or operations
+      placeholder: |
+        - Config:
+        - API:
+        - Dashboard:
+        - Telemetry:
+        - Deployment/operations:

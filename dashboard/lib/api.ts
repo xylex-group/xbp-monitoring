@@ -33,12 +33,54 @@ function buildEndpoint(path: string): string {
   return `${BASE}${path}`;
 }
 
-async function request<T>(
-  path: string,
-  init?: RequestInit
-): Promise<T> {
+type ApiMethod = "GET" | "POST" | "PUT";
+
+type ApiContract = {
+  "/api/probes": {
+    GET: ProbeStatus[];
+  };
+  [path: `/api/probes/${string}/results?show_response=true`]: {
+    GET: ProbeResult[];
+  };
+  [path: `/api/probes/${string}/trigger`]: {
+    GET: TriggerResponse;
+  };
+  "/api/stories": {
+    GET: StoryStatus[];
+  };
+  [path: `/api/stories/${string}/results?show_response=true`]: {
+    GET: StoryResult[];
+  };
+  [path: `/api/stories/${string}/trigger`]: {
+    GET: StoryResult;
+  };
+  "/api/config": {
+    GET: string;
+    PUT: string;
+  };
+  "/api/restart": {
+    POST: string;
+  };
+};
+
+type ApiPath = keyof ApiContract;
+type ApiMethodFor<Path extends ApiPath> = Extract<keyof ApiContract[Path], ApiMethod>;
+type ApiResponse<Path extends ApiPath, Method extends ApiMethodFor<Path>> = ApiContract[Path][Method];
+
+function isApiConfig(value: unknown): value is ApiConfig {
+  if (!value || typeof value !== "object") return false;
+
+  const candidate = value as Partial<ApiConfig>;
+  return Array.isArray(candidate.probes) && Array.isArray(candidate.stories);
+}
+
+async function request<Path extends ApiPath, Method extends ApiMethodFor<Path>>(
+  path: Path,
+  method: Method,
+  init?: Omit<RequestInit, "method">
+): Promise<ApiResponse<Path, Method>> {
   const endpoint = buildEndpoint(path);
-  const res = await fetch(endpoint, init);
+  const res = await fetch(endpoint, { ...init, method });
 
   const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
 
@@ -65,62 +107,74 @@ async function request<T>(
   }
 
   if (contentType.includes("application/json")) {
-    return JSON.parse(text) as T;
+    return JSON.parse(text) as ApiResponse<Path, Method>;
   }
 
-  return text as unknown as T;
+  return text as ApiResponse<Path, Method>;
 }
 
 // ── Probes status overview ────────────────────────────────────────────────────
 
 export function listProbeStatuses(): Promise<ProbeStatus[]> {
-  return request<ProbeStatus[]>('/api/probes');
+  return request("/api/probes", "GET");
 }
 
 export function getProbeResults(name: string): Promise<ProbeResult[]> {
-  return request<ProbeResult[]>(
-    `/api/probes/${encodeURIComponent(name)}/results?show_response=true`
-  );
+  const path = `/api/probes/${encodeURIComponent(name)}/results?show_response=true` as const;
+  return request(path, "GET");
 }
 
 export function triggerProbe(name: string): Promise<TriggerResponse> {
-  return request<TriggerResponse>(
-    `/api/probes/${encodeURIComponent(name)}/trigger`
-  );
+  const path = `/api/probes/${encodeURIComponent(name)}/trigger` as const;
+  return request(path, "GET");
 }
 
 // ── Stories status overview ──────────────────────────────────────────────────
 
 export function listStories(): Promise<StoryStatus[]> {
-  return request<StoryStatus[]>("/api/stories");
+  return request("/api/stories", "GET");
 }
 
 export function getStoryResults(name: string): Promise<StoryResult[]> {
-  return request<StoryResult[]>(
-    `/api/stories/${encodeURIComponent(name)}/results?show_response=true`
-  );
+  const path = `/api/stories/${encodeURIComponent(name)}/results?show_response=true` as const;
+  return request(path, "GET");
 }
 
 export function triggerStory(name: string): Promise<StoryResult> {
-  return request<StoryResult>(
-    `/api/stories/${encodeURIComponent(name)}/trigger`
-  );
+  const path = `/api/stories/${encodeURIComponent(name)}/trigger` as const;
+  return request(path, "GET");
 }
 
 // ── Config (YAML read/write) ─────────────────────────────────────────────────
 
 export async function getFullConfig(): Promise<ApiConfig> {
-  const yaml = await request<string>("/api/config");
+  const yaml = await getRawConfig();
   // Parse client-side via import — we dynamically import js-yaml
   const { load } = await import("js-yaml");
-  return load(yaml) as ApiConfig;
+  const parsed = load(yaml);
+
+  if (!isApiConfig(parsed)) {
+    throw new Error("The configuration returned by /api/config is not shaped like an XBP config.");
+  }
+
+  return parsed;
 }
 
 export async function saveFullConfig(config: ApiConfig): Promise<void> {
   const { dump } = await import("js-yaml");
   const yaml = dump(config, { lineWidth: 120 });
-  await request<string>("/api/config", {
-    method: "PUT",
+  await request("/api/config", "PUT", {
+    headers: { "Content-Type": "text/yaml" },
+    body: yaml,
+  });
+}
+
+export function getRawConfig(): Promise<string> {
+  return request("/api/config", "GET");
+}
+
+export function saveRawConfig(yaml: string): Promise<string> {
+  return request("/api/config", "PUT", {
     headers: { "Content-Type": "text/yaml" },
     body: yaml,
   });
@@ -163,5 +217,5 @@ export async function deleteProbe(name: string): Promise<void> {
 }
 
 export async function restartServer(): Promise<void> {
-  await request<string>("/api/restart", { method: "POST" });
+  await request("/api/restart", "POST");
 }
