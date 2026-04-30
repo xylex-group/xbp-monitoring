@@ -64,13 +64,13 @@ fn validate_expectation(
     status_code: u32,
     body: &String,
 ) -> Result<(), ExpectationFailedError> {
-    let expected_value = &expect.value;
-    let status_string = status_code.to_string();
-    let received_value = match expect.field {
+    let expected_value: &String = &expect.value;
+    let status_string: String = status_code.to_string();
+    let received_value: &String = match expect.field {
         ExpectField::Body => body,
         ExpectField::StatusCode => &status_string,
     };
-    let success = expectation_met(&expect.operation, expected_value, received_value);
+    let success: bool = expectation_met(&expect.operation, expected_value, received_value);
     if success {
         Ok(())
     } else {
@@ -86,14 +86,14 @@ fn validate_expectation(
 
 #[tokio::test]
 async fn test_validate_expectations_equals() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::Equals,
         &"Test".to_owned(),
         &"Test".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::Equals,
         &"Test123".to_owned(),
         &"Test".to_owned(),
@@ -103,14 +103,14 @@ async fn test_validate_expectations_equals() {
 
 #[tokio::test]
 async fn test_validate_expectations_not_equals() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::NotEquals,
         &"Test".to_owned(),
         &"Test123".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::NotEquals,
         &"Test".to_owned(),
         &"Test".to_owned(),
@@ -120,14 +120,14 @@ async fn test_validate_expectations_not_equals() {
 
 #[tokio::test]
 async fn test_validate_expectations_contains() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::Contains,
         &"Test".to_owned(),
         &"Test123".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::Contains,
         &"Test123".to_owned(),
         &"Test".to_owned(),
@@ -137,14 +137,14 @@ async fn test_validate_expectations_contains() {
 
 #[tokio::test]
 async fn test_validate_expectations_not_contains() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::NotContains,
         &"Test123".to_owned(),
         &"Test".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::NotContains,
         &"Test".to_owned(),
         &"Test123".to_owned(),
@@ -154,14 +154,14 @@ async fn test_validate_expectations_not_contains() {
 
 #[tokio::test]
 async fn test_validate_expectations_isoneof() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::IsOneOf,
         &"Test|Yes|No".to_owned(),
         &"Test".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::IsOneOf,
         &"Test|Yes|No".to_owned(),
         &"Yest".to_owned(),
@@ -171,14 +171,14 @@ async fn test_validate_expectations_isoneof() {
 
 #[tokio::test]
 async fn test_validate_expectations_matches() {
-    let success_result = expectation_met(
+    let success_result: bool = expectation_met(
         &ExpectOperation::Matches,
         &r#"^\d{5}$"#.to_owned(),
         &"12345".to_owned(),
     );
     assert!(success_result);
 
-    let fail_result = expectation_met(
+    let fail_result: bool = expectation_met(
         &ExpectOperation::Matches,
         &r#"^\d{5}$"#.to_owned(),
         &"1234".to_owned(),

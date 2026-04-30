@@ -37,10 +37,10 @@ fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_jso
 // #endregion
 
 pub fn create_tracer() {
-    let provider = match env::var("OTEL_TRACES_EXPORTER").ok().as_deref() {
+    let provider: SdkTracerProvider = match env::var("OTEL_TRACES_EXPORTER").ok().as_deref() {
         Some("otlp") => {
-            let export_config = create_otlp_export_config();
-            let span_exporter = match export_config.protocol {
+            let export_config: opentelemetry_otlp::ExportConfig = create_otlp_export_config();
+            let span_exporter: SpanExporter = match export_config.protocol {
                 opentelemetry_otlp::Protocol::Grpc => {
                     debug!("Using OTLP gRPC exporter");
                     SpanExporter::builder()
@@ -51,7 +51,7 @@ pub fn create_tracer() {
                 }
                 _ => {
                     debug!("Using OTLP HTTP exporter");
-                    let base_endpoint = export_config
+                    let base_endpoint: String = export_config
                         .endpoint
                         .clone()
                         .unwrap_or_else(|| "http://localhost:4318".to_string());
@@ -63,14 +63,14 @@ pub fn create_tracer() {
                         .unwrap()
                 }
             };
-            let processor = BatchSpanProcessor::builder(span_exporter).build();
+            let processor: BatchSpanProcessor = BatchSpanProcessor::builder(span_exporter).build();
             SdkTracerProvider::builder()
                 .with_span_processor(processor)
                 .with_resource(resource())
                 .build()
         }
         Some("stdout") => {
-            let processor =
+            let processor: BatchSpanProcessor =
                 BatchSpanProcessor::builder(opentelemetry_stdout::SpanExporter::default()).build();
             SdkTracerProvider::builder()
                 .with_span_processor(processor)
@@ -91,7 +91,7 @@ pub fn create_tracer() {
 }
 
 pub fn loki_from_env() -> Option<(LokiLayer, tracing_loki::BackgroundTask)> {
-    let enabled = env::var("XBP_LOKI_ENABLED")
+    let enabled: bool = env::var("XBP_LOKI_ENABLED")
         .ok()
         .map(|v| v.eq_ignore_ascii_case("1") || v.eq_ignore_ascii_case("true"))
         .unwrap_or(false);
@@ -100,8 +100,8 @@ pub fn loki_from_env() -> Option<(LokiLayer, tracing_loki::BackgroundTask)> {
         return None;
     }
 
-    let loki_url = env::var("XBP_LOKI_URL").unwrap_or_else(|_| "http://localhost:3100".into());
-    let parsed_url = match Url::parse(&loki_url) {
+    let loki_url: String = env::var("XBP_LOKI_URL").unwrap_or_else(|_| "http://localhost:3100".into());
+    let parsed_url: Url = match Url::parse(&loki_url) {
         Ok(url) => url,
         Err(err) => {
             eprintln!("Invalid XBP_LOKI_URL '{}': {}", loki_url, err);
@@ -109,7 +109,7 @@ pub fn loki_from_env() -> Option<(LokiLayer, tracing_loki::BackgroundTask)> {
         }
     };
 
-    let mut builder = tracing_loki::builder()
+    let mut builder: tracing_loki::Builder = tracing_loki::builder()
         .label("service", "xbp-monitoring")
         .expect("static service label should be valid");
 

@@ -378,11 +378,11 @@ mod probe_logic_tests {
 
     #[tokio::test]
     async fn test_story_success() {
-        let mock_server = MockServer::start().await;
-        let step1_path = "/test1";
-        let step2_path = "/test2";
-        let story_name = "User Flow";
-        let app_state = Arc::new(AppState::new(
+        let mock_server: MockServer = MockServer::start().await;
+        let step1_path: &str = "/test1";
+        let step2_path: &str = "/test2";
+        let story_name: &str = "User Flow";
+        let app_state: Arc<AppState> = Arc::new(AppState::new(
             Config {
                 probes: vec![],
                 stories: vec![],
@@ -435,8 +435,11 @@ mod probe_logic_tests {
 
         story.probe_and_store_result(app_state.clone()).await;
 
-        let story_result_map = app_state.story_results.read().unwrap();
-        let results = &story_result_map[story_name];
+        let story_result_map: std::sync::RwLockReadGuard<
+            '_,
+            HashMap<String, Vec<crate::probe::model::StoryResult>>,
+        > = app_state.story_results.read().unwrap();
+        let results: &Vec<crate::probe::model::StoryResult> = &story_result_map[story_name];
         assert_eq!(1, results.len());
         let story_result = &results[0];
         assert!(story_result.success);
@@ -597,8 +600,8 @@ mod probe_logic_tests {
 
         story.probe_and_store_result(app_state.clone()).await;
 
-        let story_result_map = app_state.story_results.read().unwrap();
-        let results = &story_result_map[story_name];
+        let story_result_map: std::sync::RwLockReadGuard<'_, HashMap<String, Vec<crate::probe::model::StoryResult>>> = app_state.story_results.read().unwrap();
+        let results: &Vec<crate::probe::model::StoryResult> = &story_result_map[story_name];
         assert_eq!(1, results.len());
         let story_result = &results[0];
         assert!(story_result.success);

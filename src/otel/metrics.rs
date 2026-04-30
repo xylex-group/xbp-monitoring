@@ -53,7 +53,7 @@ pub struct MetricsState {
 }
 
 pub fn initialize() -> MetricsState {
-    let exporter_env = env::var("OTEL_METRICS_EXPORTER").ok();
+    let exporter_env: Option<String> = env::var("OTEL_METRICS_EXPORTER").ok();
     // #region agent log
     agent_log(
         "A",
@@ -78,7 +78,7 @@ pub fn initialize() -> MetricsState {
                 }
                 _ => {
                     debug!("Using OTLP HTTP exporter");
-                    let base_endpoint = export_config
+                    let base_endpoint: String = export_config
                         .endpoint
                         .clone()
                         .unwrap_or_else(|| "http://localhost:4318".to_string());
@@ -93,19 +93,19 @@ pub fn initialize() -> MetricsState {
                         .unwrap()
                 }
             };
-            let reader = PeriodicReader::builder(exporter).build();
+            let reader: PeriodicReader<MetricExporter> = PeriodicReader::builder(exporter).build();
             (build_meter_provider(reader), None)
         }
         Some("stdout") => {
             debug!("Using stdout metrics exporter");
-            let exporter = opentelemetry_stdout::MetricExporter::default();
-            let reader = PeriodicReader::builder(exporter).build();
+            let exporter: opentelemetry_stdout::MetricExporter = opentelemetry_stdout::MetricExporter::default();
+            let reader: PeriodicReader<opentelemetry_stdout::MetricExporter> = PeriodicReader::builder(exporter).build();
             (build_meter_provider(reader), None)
         }
         Some("prometheus") => {
             debug!("Using Prometheus metrics exporter");
-            let registry = prometheus::Registry::new();
-            let reader = opentelemetry_prometheus::exporter()
+            let registry: prometheus::Registry = prometheus::Registry::new();
+            let reader: opentelemetry_prometheus::PrometheusExporter = opentelemetry_prometheus::exporter()
                 .with_registry(registry.clone())
                 .build()
                 .unwrap();
