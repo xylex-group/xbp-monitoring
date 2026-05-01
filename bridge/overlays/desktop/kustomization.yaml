@@ -1,0 +1,13 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - ../../base
+patches:
+    - path: app-dashboard-node-modules-persistentVolumeClaim.yaml
+    - path: app-service.yaml
+    - path: backend-backend-target-persistentVolumeClaim.yaml
+    - path: backend-cargo-git-persistentVolumeClaim.yaml
+    - path: backend-cargo-registry-persistentVolumeClaim.yaml
+    - path: backend-service.yaml

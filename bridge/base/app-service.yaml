@@ -1,0 +1,23 @@
+# check if there is at least one published port
+
+#! app-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: app-published
+    namespace: xbp-monitoring
+    labels:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: app
+spec:
+    selector:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: app
+    ports:
+        - name: app-3001
+          port: 3001
+          protocol: TCP
+          targetPort: app-80
+
+# check if there is at least one published port

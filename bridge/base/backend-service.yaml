@@ -1,0 +1,23 @@
+#! backend-service.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: backend-published
+    namespace: xbp-monitoring
+    labels:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: backend
+spec:
+    selector:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: backend
+    ports:
+        - name: backend-3000
+          port: 3000
+          protocol: TCP
+          targetPort: backend-3000
+        - name: backend-9464
+          port: 9464
+          protocol: TCP
+          targetPort: backend-9464

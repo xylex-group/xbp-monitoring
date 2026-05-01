@@ -2,7 +2,6 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use crate::errors::MapToSendError;
-use crate::probe::model::Probe;
 use chrono::Utc;
 use lazy_static::lazy_static;
 use opentelemetry::KeyValue;

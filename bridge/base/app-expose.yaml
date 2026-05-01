@@ -1,0 +1,18 @@
+#! app-expose.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: Service
+metadata:
+    name: app
+    namespace: xbp-monitoring
+    labels:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: app
+spec:
+    selector:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: app
+    ports:
+        - name: app-80
+          port: 80
+          targetPort: app-80

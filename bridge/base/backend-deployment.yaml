@@ -1,0 +1,94 @@
+#! backend-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: backend
+    namespace: xbp-monitoring
+    labels:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: backend
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: xbp-monitoring
+            com.docker.compose.service: backend
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: xbp-monitoring
+                com.docker.compose.service: backend
+                com.docker.compose.network.default: "true"
+        spec:
+            restartPolicy: unless-stopped
+            containers:
+                - name: xbp-monitoring-backend
+                  image: xbp-monitoring-backend
+                  imagePullPolicy: IfNotPresent
+                  args:
+                    - cargo
+                    - watch
+                    - -x
+                    - run -- --file /app/xbp.yml
+                  env:
+                    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+                      value: "http://localhost:4317"
+                    - name: OTEL_EXPORTER_OTLP_PROTOCOL
+                      value: "grpc"
+                    - name: OTEL_EXPORTER_OTLP_TIMEOUT
+                      value: "10"
+                    - name: OTEL_EXPORTER_PROMETHEUS_HOST
+                      value: "localhost"
+                    - name: OTEL_EXPORTER_PROMETHEUS_PORT
+                      value: "9464"
+                    - name: OTEL_METRICS_EXPORTER
+                      value: "prometheus"
+                    - name: OTEL_RESOURCE_ATTRIBUTES
+                      value: "service.name=xbp-monitoring,service.version=0.9.48"
+                    - name: OTEL_TRACES_EXPORTER
+                      value: "stdout"
+                    - name: XBP_LOKI_ENABLED
+                      value: "false"
+                    - name: XBP_LOKI_ENV
+                      value: "local"
+                    - name: XBP_LOKI_JOB
+                      value: "xbp-monitoring"
+                    - name: XBP_LOKI_URL
+                      value: "http://localhost:3100"
+                  ports:
+                    - name: backend-3000
+                      containerPort: 3000
+                    - name: backend-9464
+                      containerPort: 9464
+                  volumeMounts:
+                    - name: app-xbp-yml
+                      mountPath: /app/xbp.yml
+                      readOnly: true
+                    - name: app
+                      mountPath: /app
+                    - name: app-target
+                      mountPath: /app/target
+                    - name: usr-local-cargo-registry
+                      mountPath: /usr/local/cargo/registry
+                    - name: usr-local-cargo-git
+                      mountPath: /usr/local/cargo/git
+            volumes:
+                - name: app-xbp-yml
+                  hostPath:
+                    path: C:\Users\floris\Documents\GitHub\xbp-monitoring\xbp.yml
+                  readOnly: true
+                - name: app
+                  hostPath:
+                    path: C:\Users\floris\Documents\GitHub\xbp-monitoring
+                - name: app-target
+                  persistentVolumeClaim:
+                    claimName: backend-backend-target
+                - name: usr-local-cargo-registry
+                  persistentVolumeClaim:
+                    claimName: backend-cargo-registry
+                - name: usr-local-cargo-git
+                  persistentVolumeClaim:
+                    claimName: backend-cargo-git

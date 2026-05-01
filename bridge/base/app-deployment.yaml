@@ -1,0 +1,57 @@
+#! app-deployment.yaml
+# Generated code, do not edit
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: app
+    namespace: xbp-monitoring
+    labels:
+        com.docker.compose.project: xbp-monitoring
+        com.docker.compose.service: app
+spec:
+    replicas: 1
+    selector:
+        matchLabels:
+            com.docker.compose.project: xbp-monitoring
+            com.docker.compose.service: app
+    strategy:
+        type: Recreate
+    template:
+        metadata:
+            labels:
+                com.docker.compose.project: xbp-monitoring
+                com.docker.compose.service: app
+                com.docker.compose.network.default: "true"
+        spec:
+            restartPolicy: unless-stopped
+            containers:
+                - name: xbp-monitoring-app
+                  image: xbp-monitoring-app
+                  imagePullPolicy: IfNotPresent
+                  args:
+                    - pnpm
+                    - dev
+                    - --hostname
+                    - 0.0.0.0
+                    - -p
+                    - 80
+                  env:
+                    - name: BACKEND_BASE_URL
+                      value: "http://backend:3000"
+                    - name: NODE_ENV
+                      value: "development"
+                  ports:
+                    - name: app-80
+                      containerPort: 80
+                  volumeMounts:
+                    - name: app
+                      mountPath: /app
+                    - name: app-node-modules
+                      mountPath: /app/node_modules
+            volumes:
+                - name: app
+                  hostPath:
+                    path: C:\Users\floris\Documents\GitHub\xbp-monitoring\dashboard
+                - name: app-node-modules
+                  persistentVolumeClaim:
+                    claimName: app-dashboard-node-modules

@@ -1,0 +1,9 @@
+#! backend-backend-target-persistentVolumeClaim.yaml
+# Generated code, do not edit
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: backend-backend-target
+    namespace: xbp-monitoring
+spec:
+    storageClassName: "hostpath" # see docker/desktop-storage-provisioner

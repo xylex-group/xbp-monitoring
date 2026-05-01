@@ -1,0 +1,17 @@
+#! kustomization.yaml
+# Generated code, do not edit
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+    - 0-xbp-monitoring-namespace.yaml
+    - app-dashboard-node-modules-persistentVolumeClaim.yaml
+    - app-deployment.yaml
+    - app-expose.yaml
+    - app-service.yaml
+    - backend-backend-target-persistentVolumeClaim.yaml
+    - backend-cargo-git-persistentVolumeClaim.yaml
+    - backend-cargo-registry-persistentVolumeClaim.yaml
+    - backend-deployment.yaml
+    - backend-expose.yaml
+    - backend-service.yaml
+    - default-network-policy.yaml
