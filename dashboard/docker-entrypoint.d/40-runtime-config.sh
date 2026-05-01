@@ -11,8 +11,7 @@ EOF
 )
 
 for TARGET_FILE in \
-	"/usr/share/nginx/html/runtime-config.js" \
-	"/usr/share/nginx/html/dashboard/runtime-config.js"
+	"/usr/share/nginx/html/runtime-config.js"
 do
 	mkdir -p "$(dirname "$TARGET_FILE")"
 	printf '%s\n' "$RUNTIME_CONFIG_CONTENT" > "$TARGET_FILE"
