@@ -104,6 +104,8 @@ Services:
 - Dashboard: `http://localhost:3001/dashboard`
 - Dedicated metrics listener: `http://localhost:9464/metrics` when enabled
 
+The dashboard container is static-only and does not reverse proxy API traffic through nginx. In local Compose, `NEXT_PUBLIC_API_BASE_URL` defaults to `http://localhost:3000`; in hosted environments, point it at your public backend URL.
+
 ### Development compose
 
 The repository also includes a development override:
@@ -195,6 +197,8 @@ Cross-origin dashboard access:
 - Set `NEXT_PUBLIC_API_BASE_URL=https://xbp-monitoring-production-8e98.up.railway.app` on the dashboard when it is hosted on a different origin from the backend.
 
 The dashboard stores a user-selected API URL in browser local storage, so operators can still override the env default from the Config page when needed.
+
+If you deploy the dashboard without a sibling `backend` container, this direct API URL configuration is required; the nginx image intentionally avoids container-name upstream dependencies so it can boot cleanly in standalone platforms such as Railway.
 
 See also:
 
