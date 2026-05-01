@@ -7,6 +7,20 @@ import { useApiUrl } from "@/lib/useApiUrl";
 import { useToast } from "@/components/ToastProvider";
 import { getRawConfig, restartServer, saveRawConfig } from "@/lib/api";
 
+function isCrossOriginApiUrl(url: string): boolean {
+  const cleaned = url.trim();
+
+  if (!cleaned || typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return new URL(cleaned, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+}
+
 export default function ConfigPage() {
   const { toast } = useToast();
   const { url: apiUrl, setUrl: setApiUrl, mounted } = useApiUrl();
@@ -69,6 +83,14 @@ export default function ConfigPage() {
     toast("Changes discarded.", { variant: "warning" });
   }
 
+  function switchToSameOriginApi() {
+    setTempApiUrl("");
+    setApiUrl("");
+    toast("Switched to same-origin API URL.", { variant: "success" });
+  }
+
+  const hasCrossOriginApiUrl = mounted && isCrossOriginApiUrl(tempApiUrl);
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -126,6 +148,25 @@ export default function ConfigPage() {
                 e.g., http://127.0.0.1:3000 for local dev, empty for production
               </div>
             </TextField>
+
+            {hasCrossOriginApiUrl && (
+              <div className="max-w-3xl rounded-lg border border-warning-300 bg-warning-50 p-3 text-warning-900 dark:border-warning-700 dark:bg-warning-900/20 dark:text-warning-200">
+                <div className="flex items-start gap-2">
+                  <Icon icon="gravity-ui:triangle-exclamation" className="mt-0.5 size-4 shrink-0" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Cross-origin API URL detected</p>
+                    <p className="text-xs">
+                      This dashboard is configured to call a different origin. If backend CORS is disabled, requests like
+                      <span className="font-mono"> /probes</span> will fail in the browser.
+                    </p>
+                    <Button size="sm" variant="secondary" onPress={switchToSameOriginApi}>
+                      Use same-origin URL
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-2">
               <Button size="sm" onPress={handleSaveApiUrl}>Save URL</Button>
               <Button size="sm" variant="ghost" onPress={resetApiUrl}>Discard</Button>

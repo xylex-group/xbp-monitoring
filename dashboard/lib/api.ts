@@ -28,9 +28,20 @@ function shorten(text: string, max = 240): string {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-function buildEndpoint(path: string): string {
-  const BASE = getBASE();
-  return `${BASE}${path}`;
+function buildEndpointWithBase(path: string, baseUrl: string): string {
+  return `${baseUrl}${path}`;
+}
+
+function isCrossOriginBaseUrl(baseUrl: string): boolean {
+  if (!baseUrl || typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return new URL(baseUrl, window.location.href).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
 }
 
 type ApiMethod = "GET" | "POST" | "PUT";
@@ -79,8 +90,32 @@ async function request<Path extends ApiPath, Method extends ApiMethodFor<Path>>(
   method: Method,
   init?: Omit<RequestInit, "method">
 ): Promise<ApiResponse<Path, Method>> {
-  const endpoint = buildEndpoint(path);
-  const res = await fetch(endpoint, { ...init, method });
+  const BASE = getBASE();
+  const endpoint = buildEndpointWithBase(path, BASE);
+  let res: Response;
+
+  try {
+    res = await fetch(endpoint, { ...init, method });
+  } catch (err) {
+    // If an explicit base URL fails (often due to CORS), retry once with same-origin.
+    // This helps local dev setups that rely on Next rewrites/proxy.
+    if (BASE) {
+      try {
+        res = await fetch(buildEndpointWithBase(path, ""), { ...init, method });
+      } catch {
+        if (isCrossOriginBaseUrl(BASE)) {
+          throw new Error(
+            `Request failed for ${path}. Current API Base URL (${BASE}) is cross-origin and CORS may be disabled. ` +
+              `Clear the API Base URL in Config to use same-origin/proxy, or enable backend CORS.`
+          );
+        }
+
+        throw err instanceof Error ? err : new Error(String(err));
+      }
+    } else {
+      throw err instanceof Error ? err : new Error(String(err));
+    }
+  }
 
   const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
 
