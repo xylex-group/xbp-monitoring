@@ -20,6 +20,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -28,8 +32,6 @@ jobs:
           cache-dependency-path: |
             pnpm-lock.yaml
             dashboard/pnpm-lock.yaml
-      - name: Enable Corepack
-        run: corepack enable
       - name: Install dashboard dependencies
         run: pnpm --dir dashboard install --frozen-lockfile
       - name: Build Rust backend

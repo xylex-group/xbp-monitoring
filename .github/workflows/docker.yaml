@@ -29,7 +29,7 @@ jobs:
             image_suffix: backend
           - name: dashboard
             context: ./dashboard
-            dockerfile: Dockerfile
+            dockerfile: dashboard/Dockerfile
             image_suffix: dashboard
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:

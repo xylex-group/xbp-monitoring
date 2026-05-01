@@ -27,6 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -35,8 +39,6 @@ jobs:
           cache-dependency-path: |
             pnpm-lock.yaml
             dashboard/pnpm-lock.yaml
-      - name: Enable Corepack
-        run: corepack enable
       - name: Install dashboard dependencies
         run: pnpm --dir dashboard install --frozen-lockfile
       - name: Run dashboard typecheck
