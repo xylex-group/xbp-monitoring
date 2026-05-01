@@ -13,7 +13,7 @@ import { getApiUrl } from "./useApiUrl";
 /**
  * Base URL for API requests.
  * - Production (Rust serves dashboard + API on same origin): empty string
- * - Local Next dev: set via dashboard settings or NEXT_PUBLIC_API_BASE_URL env var
+ * - Local Next dev: set via dashboard settings or dashboard runtime config
  * - Users can customize via Config page settings
  */
 function getBASE(): string {
@@ -36,22 +36,22 @@ function buildEndpoint(path: string): string {
 type ApiMethod = "GET" | "POST" | "PUT";
 
 type ApiContract = {
-  "/api/probes": {
+  "/probes": {
     GET: ProbeStatus[];
   };
-  [path: `/api/probes/${string}/results?show_response=true`]: {
+  [path: `/probes/${string}/results?show_response=true`]: {
     GET: ProbeResult[];
   };
-  [path: `/api/probes/${string}/trigger`]: {
+  [path: `/probes/${string}/trigger`]: {
     GET: TriggerResponse;
   };
-  "/api/stories": {
+  "/stories": {
     GET: StoryStatus[];
   };
-  [path: `/api/stories/${string}/results?show_response=true`]: {
+  [path: `/stories/${string}/results?show_response=true`]: {
     GET: StoryResult[];
   };
-  [path: `/api/stories/${string}/trigger`]: {
+  [path: `/stories/${string}/trigger`]: {
     GET: StoryResult;
   };
   "/api/config": {
@@ -116,32 +116,32 @@ async function request<Path extends ApiPath, Method extends ApiMethodFor<Path>>(
 // ── Probes status overview ────────────────────────────────────────────────────
 
 export function listProbeStatuses(): Promise<ProbeStatus[]> {
-  return request("/api/probes", "GET");
+  return request("/probes", "GET");
 }
 
 export function getProbeResults(name: string): Promise<ProbeResult[]> {
-  const path = `/api/probes/${encodeURIComponent(name)}/results?show_response=true` as const;
+  const path = `/probes/${encodeURIComponent(name)}/results?show_response=true` as const;
   return request(path, "GET");
 }
 
 export function triggerProbe(name: string): Promise<TriggerResponse> {
-  const path = `/api/probes/${encodeURIComponent(name)}/trigger` as const;
+  const path = `/probes/${encodeURIComponent(name)}/trigger` as const;
   return request(path, "GET");
 }
 
 // ── Stories status overview ──────────────────────────────────────────────────
 
 export function listStories(): Promise<StoryStatus[]> {
-  return request("/api/stories", "GET");
+  return request("/stories", "GET");
 }
 
 export function getStoryResults(name: string): Promise<StoryResult[]> {
-  const path = `/api/stories/${encodeURIComponent(name)}/results?show_response=true` as const;
+  const path = `/stories/${encodeURIComponent(name)}/results?show_response=true` as const;
   return request(path, "GET");
 }
 
 export function triggerStory(name: string): Promise<StoryResult> {
-  const path = `/api/stories/${encodeURIComponent(name)}/trigger` as const;
+  const path = `/stories/${encodeURIComponent(name)}/trigger` as const;
   return request(path, "GET");
 }
 

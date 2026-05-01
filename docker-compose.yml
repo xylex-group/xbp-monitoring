@@ -20,6 +20,8 @@ services:
     container_name: xbp-monitoring-app
     depends_on:
       - backend
+    env_file:
+      - .env
     ports:
       - "3001:80"
     restart: unless-stopped

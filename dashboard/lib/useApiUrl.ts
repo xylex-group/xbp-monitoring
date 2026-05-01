@@ -4,9 +4,37 @@ import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "xbp-api-base-url";
 
+declare global {
+  interface Window {
+    __XBP_RUNTIME_CONFIG__?: {
+      apiBaseUrl?: string;
+    };
+  }
+}
+
+function normalizeUrl(url: string | null | undefined): string {
+  return (url ?? "").trim().replace(/\/$/, "");
+}
+
+function getRuntimeApiUrl(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return normalizeUrl(window.__XBP_RUNTIME_CONFIG__?.apiBaseUrl);
+}
+
+function getEnvApiUrl(): string {
+  return normalizeUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+}
+
+function getDefaultApiUrl(): string {
+  return getRuntimeApiUrl() || getEnvApiUrl();
+}
+
 /**
  * Hook to manage and persist the API base URL.
- * Falls back to NEXT_PUBLIC_API_BASE_URL env var or empty string.
+ * Falls back to runtime config, then NEXT_PUBLIC_API_BASE_URL, then empty string.
  */
 export function useApiUrl() {
   const [url, setUrlState] = useState<string>("");
@@ -15,13 +43,12 @@ export function useApiUrl() {
   // Load from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    const envUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-    setUrlState(stored ?? envUrl);
+    setUrlState(normalizeUrl(stored) || getDefaultApiUrl());
     setMounted(true);
   }, []);
 
   const setUrl = useCallback((newUrl: string) => {
-    const cleaned = newUrl.replace(/\/$/, "");
+    const cleaned = normalizeUrl(newUrl);
     setUrlState(cleaned);
     if (cleaned) {
       localStorage.setItem(STORAGE_KEY, cleaned);
@@ -39,9 +66,9 @@ export function useApiUrl() {
  */
 export function getApiUrl(): string {
   if (typeof window === "undefined") {
-    return (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
+    return getEnvApiUrl();
   }
+
   const stored = localStorage.getItem(STORAGE_KEY);
-  const envUrl = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/$/, "");
-  return stored ?? envUrl;
+  return normalizeUrl(stored) || getDefaultApiUrl();
 }

@@ -14,6 +14,7 @@ use crate::web_server::{
     telemetry::telemetry_status,
 };
 use axum::{
+    http::{HeaderValue, Method},
     routing::{get, post},
     Extension, Router,
 };
@@ -22,6 +23,7 @@ use std::{
     io::{ErrorKind, Result as IoResult},
     sync::Arc,
 };
+use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::ServeDir;
 use tracing::{debug, error, info, warn};
 
@@ -52,6 +54,12 @@ pub async fn start_axum_server(app_state: Arc<AppState>) -> IoResult<()> {
         .route("/api/config", get(get_config).put(put_config))
         .route("/api/restart", post(restart))
         .layer(Extension(app_state.clone()));
+
+    let app = if let Some(cors_layer) = build_cors_layer() {
+        app.layer(cors_layer)
+    } else {
+        app
+    };
 
     let listener = match tokio::net::TcpListener::bind("0.0.0.0:3000").await {
         Ok(listener) => listener,
@@ -116,4 +124,55 @@ pub async fn start_prometheus_server(registry: Arc<prometheus::Registry>) {
 async fn root() -> &'static str {
     debug!("Application root called");
     "Roar!"
+}
+
+fn build_cors_layer() -> Option<CorsLayer> {
+    if !env_flag("XBP_CORS_ENABLED") {
+        info!("CORS support disabled; only same-origin browser requests are allowed");
+        return None;
+    }
+
+    let allow_origins = env::var("XBP_CORS_ALLOW_ORIGINS").unwrap_or_else(|_| "*".to_owned());
+    let cors_layer = CorsLayer::new()
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PUT,
+            Method::OPTIONS,
+        ])
+        .allow_headers(Any);
+
+    if allow_origins.trim() == "*" {
+        info!("CORS support enabled for all origins");
+        return Some(cors_layer.allow_origin(Any));
+    }
+
+    let origins: Vec<HeaderValue> = allow_origins
+        .split(',')
+        .map(str::trim)
+        .filter(|origin| !origin.is_empty())
+        .filter_map(|origin| match HeaderValue::from_str(origin) {
+            Ok(value) => Some(value),
+            Err(err) => {
+                warn!("Ignoring invalid CORS origin '{origin}': {err}");
+                None
+            }
+        })
+        .collect();
+
+    if origins.is_empty() {
+        warn!(
+            "CORS support was enabled but XBP_CORS_ALLOW_ORIGINS did not contain any valid origins; falling back to '*'"
+        );
+        return Some(cors_layer.allow_origin(Any));
+    }
+
+    info!("CORS support enabled for configured origins: {allow_origins}");
+    Some(cors_layer.allow_origin(AllowOrigin::list(origins)))
+}
+
+fn env_flag(name: &str) -> bool {
+    env::var(name)
+        .map(|value| matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes" | "on"))
+        .unwrap_or(false)
 }

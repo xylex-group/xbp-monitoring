@@ -77,6 +77,11 @@ In this mode:
 - Next dev server runs on `http://127.0.0.1:3001/dashboard`
 - API requests from the dashboard are proxied to the backend
 
+Optional dashboard env overrides:
+
+- `BACKEND_BASE_URL=http://127.0.0.1:3000` controls the Next dev proxy target
+- `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:3000` sets the dashboard's default direct API URL
+
 If the UI starts returning HTML for API requests, it usually means the dashboard is running without the backend on port `3000`. Tiny bug, classic vibes.
 
 ## Docker
@@ -113,6 +118,8 @@ This setup adds:
 - backend auto-reload with `cargo-watch`,
 - dashboard dev server inside the container,
 - container-aware dashboard API proxying.
+
+The dashboard container also reads `NEXT_PUBLIC_API_BASE_URL` at startup and writes it into a small runtime config file, so you can point the UI at a separate backend origin without rebuilding the image.
 
 Run development containers:
 
@@ -176,6 +183,18 @@ Important variables:
 - `XBP_LOKI_JOB`
 - `XBP_LOKI_ENV`
 - `XBP_RESTART_CMD`
+- `XBP_CORS_ENABLED`
+- `XBP_CORS_ALLOW_ORIGINS`
+- `NEXT_PUBLIC_API_BASE_URL`
+- `BACKEND_BASE_URL`
+
+Cross-origin dashboard access:
+
+- Set `XBP_CORS_ENABLED=true` on the backend to emit CORS headers.
+- Set `XBP_CORS_ALLOW_ORIGINS=https://monitoring-v2.xbp.app` (or `*`) to control which origins may call the API.
+- Set `NEXT_PUBLIC_API_BASE_URL=https://xbp-monitoring-production-8e98.up.railway.app` on the dashboard when it is hosted on a different origin from the backend.
+
+The dashboard stores a user-selected API URL in browser local storage, so operators can still override the env default from the Config page when needed.
 
 See also:
 
@@ -197,6 +216,8 @@ The application currently exposes endpoints such as:
 - `/api/restart`
 - `/api/telemetry`
 - `/metrics`
+
+When the dashboard is hosted on a different origin, it calls `/probes`, `/stories`, and `/api/*` directly against the configured backend base URL.
 
 OpenAPI definition:
 
