@@ -7,35 +7,12 @@ use opentelemetry_sdk::metrics::{
     reader::MetricReader, MeterProviderBuilder, PeriodicReader, SdkMeterProvider,
 };
 
-use chrono::Utc;
-use std::{env, fs::OpenOptions, io::Write, sync::Arc};
+use std::{env, sync::Arc};
 use tracing::debug;
 
 use crate::otel::create_otlp_export_config;
 
 use super::resource;
-
-// #region agent log
-fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("c:\\Users\\floris\\Documents\\GitHub\\xbp-monitoring\\.cursor\\debug.log")
-    {
-        if let Ok(line) = serde_json::to_string(&serde_json::json!({
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": Utc::now().timestamp_millis(),
-        })) {
-            let _ = writeln!(file, "{}", line);
-        }
-    }
-}
-// #endregion
 
 fn build_meter_provider<T>(reader: T) -> SdkMeterProvider
 where
@@ -54,14 +31,6 @@ pub struct MetricsState {
 
 pub fn initialize() -> MetricsState {
     let exporter_env: Option<String> = env::var("OTEL_METRICS_EXPORTER").ok();
-    // #region agent log
-    agent_log(
-        "A",
-        "metrics.rs:initialize",
-        "env OTEL_METRICS_EXPORTER",
-        serde_json::json!({ "value": exporter_env }),
-    );
-    // #endregion
 
     let (meter_provider, prometheus_registry) = match exporter_env.as_deref() {
         Some("otlp") => {
@@ -113,14 +82,6 @@ pub fn initialize() -> MetricsState {
         }
         _ => {
             debug!("No metrics exporter configured");
-            // #region agent log
-            agent_log(
-                "B",
-                "metrics.rs:initialize",
-                "no exporter configured",
-                serde_json::json!({}),
-            );
-            // #endregion
             return MetricsState {
                 meter: None,
                 registry: None,
@@ -129,14 +90,6 @@ pub fn initialize() -> MetricsState {
     };
 
     global::set_meter_provider(meter_provider.clone());
-    // #region agent log
-    agent_log(
-        "B",
-        "metrics.rs:initialize",
-        "meter provider ready",
-        serde_json::json!({ "has_registry": prometheus_registry.is_some() }),
-    );
-    // #endregion
 
     MetricsState {
         meter: Some(meter_provider),
@@ -167,14 +120,6 @@ impl MonitorStatus {
 impl Metrics {
     pub fn new() -> Metrics {
         let meter: opentelemetry::metrics::Meter = opentelemetry::global::meter("xbp");
-        // #region agent log
-        agent_log(
-            "C",
-            "metrics.rs:new",
-            "meter created",
-            serde_json::json!({}),
-        );
-        // #endregion
         Metrics {
             duration: meter
                 .u64_histogram("duration")

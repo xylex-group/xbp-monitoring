@@ -6,35 +6,10 @@ use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing_loki::Layer as LokiLayer;
 use url::Url;
 
-use chrono::Utc;
 use opentelemetry_sdk::trace::{BatchSpanProcessor, SdkTracerProvider};
-use std::fs::OpenOptions;
-use std::io::Write;
 use tracing::debug;
 
 use super::{create_otlp_export_config, resource};
-
-// #region agent log
-fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("c:\\Users\\floris\\Documents\\GitHub\\xbp-monitoring\\.cursor\\debug.log")
-    {
-        if let Ok(line) = serde_json::to_string(&serde_json::json!({
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": Utc::now().timestamp_millis(),
-        })) {
-            let _ = writeln!(file, "{}", line);
-        }
-    }
-}
-// #endregion
 
 pub fn create_tracer() {
     let provider: SdkTracerProvider = match env::var("OTEL_TRACES_EXPORTER").ok().as_deref() {
@@ -80,14 +55,6 @@ pub fn create_tracer() {
     };
     global::set_tracer_provider(provider.clone());
     global::set_text_map_propagator(TraceContextPropagator::new());
-    // #region agent log
-    agent_log(
-        "D",
-        "tracing.rs:create_tracer",
-        "tracer initialized",
-        serde_json::json!({ "has_traces": true }),
-    );
-    // #endregion
 }
 
 pub fn loki_from_env() -> Option<(LokiLayer, tracing_loki::BackgroundTask)> {

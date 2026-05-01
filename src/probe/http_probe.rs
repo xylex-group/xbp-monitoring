@@ -21,32 +21,8 @@ use opentelemetry::trace::TraceContextExt;
 use opentelemetry::Context;
 use opentelemetry::{global, trace::Tracer};
 use std::error::Error;
-use std::fs::OpenOptions;
-use std::io::Write;
 
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 10;
-
-// #region agent log
-fn agent_log(hypothesis_id: &str, location: &str, message: &str, data: serde_json::Value) {
-    if let Ok(mut file) = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open("c:\\Users\\floris\\Documents\\GitHub\\xbp-monitoring\\.cursor\\debug.log")
-    {
-        if let Ok(line) = serde_json::to_string(&serde_json::json!({
-            "sessionId": "debug-session",
-            "runId": "pre-fix",
-            "hypothesisId": hypothesis_id,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": Utc::now().timestamp_millis(),
-        })) {
-            let _ = writeln!(file, "{}", line);
-        }
-    }
-}
-// #endregion
 
 lazy_static! {
     static ref CLIENT: reqwest::Client = reqwest::ClientBuilder::new()
@@ -104,18 +80,6 @@ pub async fn call_endpoint(
         "http.response.status_code",
         result.status_code as i64,
     ));
-    // #region agent log
-    agent_log(
-        "E",
-        "http_probe.rs:call_endpoint",
-        "response received",
-        serde_json::json!({
-            "method": http_method,
-            "url": url,
-            "status": result.status_code
-        }),
-    );
-    // #endregion
     if !sensitive {
         span.add_event(
             "response",
