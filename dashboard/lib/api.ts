@@ -6,6 +6,7 @@ import type {
   StoryResult,
   StoryStatus,
   TriggerResponse,
+  BackendHealthStatus,
 } from "./types";
 
 import { getApiUrl } from "./useApiUrl";
@@ -68,6 +69,9 @@ type ApiContract = {
   "/api/config": {
     GET: string;
     PUT: string;
+  };
+  "/api/health": {
+    GET: BackendHealthStatus;
   };
   "/api/restart": {
     POST: string;
@@ -220,6 +224,10 @@ export async function saveFullConfig(config: ApiConfig): Promise<void> {
 
 export function getRawConfig(): Promise<string> {
   return request("/api/config", "GET");
+}
+
+export function getBackendHealthStatus(): Promise<BackendHealthStatus> {
+  return request("/api/health", "GET");
 }
 
 export function saveRawConfig(yaml: string): Promise<string> {

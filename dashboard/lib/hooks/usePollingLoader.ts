@@ -7,6 +7,8 @@ export interface UsePollingLoaderOptions {
   intervalMs?: number;
   /** Minimum milliseconds between calls (guard against rapid re-invocations). */
   minIntervalMs?: number;
+  /** Disable polling until external readiness is met. */
+  enabled?: boolean;
 }
 
 /**
@@ -16,7 +18,7 @@ export interface UsePollingLoaderOptions {
  */
 export function usePollingLoader(
   loader: () => Promise<void>,
-  { intervalMs = 30_000, minIntervalMs = 0 }: UsePollingLoaderOptions = {},
+  { intervalMs = 30_000, minIntervalMs = 0, enabled = true }: UsePollingLoaderOptions = {},
 ): { reload: () => void } {
   const inFlightRef = useRef(false);
   const lastCalledAtRef = useRef(0);
@@ -40,10 +42,11 @@ export function usePollingLoader(
   );
 
   useEffect(() => {
+    if (!enabled) return;
     void run(true);
     const id = setInterval(() => void run(false), intervalMs);
     return () => clearInterval(id);
-  }, [run, intervalMs]);
+  }, [enabled, run, intervalMs]);
 
   const reload = useCallback(() => void run(true), [run]);
 

@@ -121,5 +121,11 @@ export interface ApiConfig {
   stories: Story[];
 }
 
+export interface BackendHealthStatus {
+  status: string;
+  service: string;
+  version: string;
+}
+
 export type ConfigCollectionKey = keyof Pick<ApiConfig, "probes" | "stories">;
 export type ConfigEntity<K extends ConfigCollectionKey> = ApiConfig[K][number];

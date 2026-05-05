@@ -16,6 +16,7 @@ import { MonitorForm } from "@/components/MonitorForm";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
 import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
+import { useSharedBackendReadiness } from "@/components/BackendReadinessProvider";
 import {
   STATUS_COLOR,
   buildStatusMap,
@@ -33,6 +34,7 @@ export default function MonitorsPage() {
   const [editProbe, setEditProbe] = useState<Probe | null>(null);
   const [resultsProbe, setResultsProbe] = useState<string | null>(null);
   const [triggering, setTriggering] = useState<string | null>(null);
+  const { ready: backendReady, hasChecked: backendHasChecked } = useSharedBackendReadiness();
 
   const load = useCallback(async () => {
     try {
@@ -49,7 +51,7 @@ export default function MonitorsPage() {
     }
   }, [toast]);
 
-  const { reload } = usePollingLoader(load);
+  const { reload } = usePollingLoader(load, { enabled: backendReady });
 
   async function handleDelete(name: string) {
     if (!confirm(`Delete monitor "${name}"?`)) return;
@@ -111,9 +113,16 @@ export default function MonitorsPage() {
       </div>
 
       {/* Table */}
-      {loading ? (
+      {loading || !backendReady ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+          <div className="flex flex-col items-center gap-3">
+            <Spinner size="lg" />
+            <p className="text-xs text-muted">
+              {!backendHasChecked
+                ? "Checking backend readiness..."
+                : "Waiting for backend startup (Docker compile in progress)."}
+            </p>
+          </div>
         </div>
       ) : (
         <Table>

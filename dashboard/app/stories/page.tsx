@@ -8,6 +8,7 @@ import { listStories, triggerStory } from "@/lib/api";
 import type { StoryStatus } from "@/lib/types";
 import { useToast } from "@/components/ToastProvider";
 import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
+import { useSharedBackendReadiness } from "@/components/BackendReadinessProvider";
 import { STATUS_COLOR, relativeTimeLabel } from "@/lib/monitoring-ui";
 
 export default function StoriesPage() {
@@ -16,6 +17,7 @@ export default function StoriesPage() {
   const [stories, setStories] = useState<StoryStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [triggering, setTriggering] = useState<string | null>(null);
+  const { ready: backendReady, hasChecked: backendHasChecked } = useSharedBackendReadiness();
 
   const load = useCallback(async () => {
     try {
@@ -27,7 +29,7 @@ export default function StoriesPage() {
     }
   }, [toast]);
 
-  const { reload } = usePollingLoader(load);
+  const { reload } = usePollingLoader(load, { enabled: backendReady });
 
   async function handleTrigger(name: string) {
     setTriggering(name);
@@ -51,9 +53,16 @@ export default function StoriesPage() {
         </p>
       </div>
 
-      {loading ? (
+      {loading || !backendReady ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+          <div className="flex flex-col items-center gap-3">
+            <Spinner size="lg" />
+            <p className="text-xs text-muted">
+              {!backendHasChecked
+                ? "Checking backend readiness..."
+                : "Waiting for backend startup (Docker compile in progress)."}
+            </p>
+          </div>
         </div>
       ) : (
         <Table>

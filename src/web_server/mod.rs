@@ -1,4 +1,5 @@
 mod config_api;
+mod health;
 mod model;
 mod probes;
 mod prometheus_metrics;
@@ -8,6 +9,7 @@ mod telemetry;
 
 use crate::web_server::{
     config_api::{get_config, put_config},
+    health::health_status,
     probes::{get_probe_results, probe_trigger, probes},
     restart::restart,
     stories::{get_story_results, stories, story_trigger},
@@ -54,6 +56,7 @@ pub async fn start_axum_server(app_state: Arc<AppState>) -> IoResult<()> {
             "/metrics",
             get(prometheus_metrics::metrics_from_app_state_handler),
         )
+        .route("/api/health", get(health_status))
         .route("/api/telemetry", get(telemetry_status))
         .route("/api/config", get(get_config).put(put_config))
         .route("/api/restart", post(restart))
