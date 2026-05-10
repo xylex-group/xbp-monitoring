@@ -25,3 +25,10 @@ pub struct TelemetryStatusResponse {
     pub loki_job: Option<String>,
     pub loki_env: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HealthStatusResponse {
+    pub status: String,
+    pub service: String,
+    pub version: String,
+}

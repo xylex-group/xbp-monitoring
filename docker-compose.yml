@@ -11,6 +11,12 @@ services:
       - .env
     volumes:
       - ./xbp.yml:/app/xbp.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
     restart: unless-stopped
 
   app:
@@ -19,7 +25,8 @@ services:
       dockerfile: Dockerfile
     container_name: xbp-monitoring-app
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     env_file:
       - .env
     environment:

@@ -35,3 +35,4 @@ probes:
         value: '200'
     alerts: []
     sensitive: false
+stories: []

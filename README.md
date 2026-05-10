@@ -104,6 +104,8 @@ Services:
 - Dashboard: `http://localhost:3001/dashboard`
 - Dedicated metrics listener: `http://localhost:9464/metrics` when enabled
 
+The Compose stack includes a backend healthcheck (`/api/health`) and delays dashboard startup until backend health is ready.
+
 The dashboard container is static-only and does not reverse proxy API traffic through nginx. In local Compose, `NEXT_PUBLIC_API_BASE_URL` defaults to `http://localhost:3000`; in hosted environments, point it at your public backend URL.
 
 ### Development compose
@@ -216,6 +218,7 @@ The application currently exposes endpoints such as:
 - `/stories`
 - `/stories/:name/results`
 - `/stories/:name/trigger`
+- `/api/health`
 - `/api/config`
 - `/api/restart`
 - `/api/telemetry`

@@ -15,13 +15,16 @@ FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
+ENV XBP_CONFIG_PATH=/app/xbp.yml
+
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates libssl3 \
+    && apt-get install -y --no-install-recommends ca-certificates curl libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/xbp-monitoring /usr/local/bin/xbp-monitoring
 COPY xbp.yml /app/xbp.yml
+RUN ln -sf /app/xbp.yml /app/xpp.yaml
 
 EXPOSE 3000 9464
 
-CMD ["xbp-monitoring", "--file", "/app/xbp.yml"]
+CMD ["sh", "-c", "exec xbp-monitoring --file \"${XBP_CONFIG_PATH:-/app/xbp.yml}\""]
