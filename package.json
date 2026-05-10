@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --dir dashboard run dev",
-    "build": "pnpm --dir dashboard run build",
+    "build": "pnpm --dir dashboard install --frozen-lockfile --prod=false && pnpm --dir dashboard run build",
     "lint": "pnpm --dir dashboard run lint",
     "typecheck": "pnpm --dir dashboard run typecheck",
     "verify": "pnpm run typecheck && cargo fmt --all -- --check && cargo clippy --all-targets --all-features && cargo test",
