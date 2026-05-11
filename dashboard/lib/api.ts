@@ -6,6 +6,7 @@ import type {
   StoryResult,
   StoryStatus,
   TriggerResponse,
+  BackendHealthStatus,
 } from "./types";
 
 import { getApiUrl } from "./useApiUrl";
@@ -69,6 +70,9 @@ type ApiContract = {
     GET: string;
     PUT: string;
   };
+  "/api/health": {
+    GET: BackendHealthStatus;
+  };
   "/api/restart": {
     POST: string;
   };
@@ -82,7 +86,21 @@ function isApiConfig(value: unknown): value is ApiConfig {
   if (!value || typeof value !== "object") return false;
 
   const candidate = value as Partial<ApiConfig>;
-  return Array.isArray(candidate.probes) && Array.isArray(candidate.stories);
+  const probesOk = candidate.probes === undefined || Array.isArray(candidate.probes);
+  const storiesOk = candidate.stories === undefined || Array.isArray(candidate.stories);
+  return probesOk && storiesOk;
+}
+
+function normalizeApiConfig(value: unknown): ApiConfig | null {
+  if (!isApiConfig(value)) {
+    return null;
+  }
+
+  const candidate = value as Partial<ApiConfig>;
+  return {
+    probes: candidate.probes ?? [],
+    stories: candidate.stories ?? [],
+  };
 }
 
 async function request<Path extends ApiPath, Method extends ApiMethodFor<Path>>(
@@ -186,9 +204,9 @@ export async function getFullConfig(): Promise<ApiConfig> {
   const yaml = await getRawConfig();
   // Parse client-side via import — we dynamically import js-yaml
   const { load } = await import("js-yaml");
-  const parsed = load(yaml);
+  const parsed = normalizeApiConfig(load(yaml));
 
-  if (!isApiConfig(parsed)) {
+  if (!parsed) {
     throw new Error("The configuration returned by /api/config is not shaped like an XBP config.");
   }
 
@@ -206,6 +224,10 @@ export async function saveFullConfig(config: ApiConfig): Promise<void> {
 
 export function getRawConfig(): Promise<string> {
   return request("/api/config", "GET");
+}
+
+export function getBackendHealthStatus(): Promise<BackendHealthStatus> {
+  return request("/api/health", "GET");
 }
 
 export function saveRawConfig(yaml: string): Promise<string> {

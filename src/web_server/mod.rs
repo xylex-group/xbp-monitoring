@@ -1,4 +1,5 @@
 mod config_api;
+mod health;
 mod model;
 mod probes;
 mod prometheus_metrics;
@@ -8,6 +9,7 @@ mod telemetry;
 
 use crate::web_server::{
     config_api::{get_config, put_config},
+    health::health_status,
     probes::{get_probe_results, probe_trigger, probes},
     restart::restart,
     stories::{get_story_results, stories, story_trigger},
@@ -15,6 +17,8 @@ use crate::web_server::{
 };
 use axum::{
     http::Method,
+    middleware,
+    response::Response,
     routing::{get, post},
     Extension, Router,
 };
@@ -28,6 +32,8 @@ use tower_http::services::ServeDir;
 use tracing::{debug, error, info, warn};
 
 use crate::app_state::AppState;
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn ansi(code: &str, text: &str) -> String {
     format!("\x1b[{code}m{text}\x1b[0m")
@@ -50,9 +56,11 @@ pub async fn start_axum_server(app_state: Arc<AppState>) -> IoResult<()> {
             "/metrics",
             get(prometheus_metrics::metrics_from_app_state_handler),
         )
+        .route("/api/health", get(health_status))
         .route("/api/telemetry", get(telemetry_status))
         .route("/api/config", get(get_config).put(put_config))
         .route("/api/restart", post(restart))
+        .layer(middleware::map_response(attach_version_headers))
         .layer(Extension(app_state.clone()));
 
     let app = app.layer(build_cors_layer());
@@ -125,12 +133,20 @@ async fn root() -> &'static str {
 fn build_cors_layer() -> CorsLayer {
     info!("CORS support forced to allow all origins");
     CorsLayer::new()
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::OPTIONS,
-        ])
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::OPTIONS])
         .allow_headers(Any)
         .allow_origin(Any)
+}
+
+async fn attach_version_headers(mut response: Response) -> Response {
+    let headers = response.headers_mut();
+    headers.insert(
+        "x-xpp-version",
+        axum::http::HeaderValue::from_static(APP_VERSION),
+    );
+    headers.insert(
+        "x-xbp-version",
+        axum::http::HeaderValue::from_static(APP_VERSION),
+    );
+    response
 }

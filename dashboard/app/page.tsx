@@ -17,6 +17,7 @@ import type { Probe, ProbeResult, ProbeStatus } from "@/lib/types";
 import { ResultsDrawer } from "@/components/ResultsDrawer";
 import { useToast } from "@/components/ToastProvider";
 import { usePollingLoader } from "@/lib/hooks/usePollingLoader";
+import { useSharedBackendReadiness } from "@/components/BackendReadinessProvider";
 import {
   STATUS_STYLES,
   buildNamedEntityMap,
@@ -46,6 +47,7 @@ export default function DashboardPage() {
   const [resultsProbe, setResultsProbe] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const loadingRef = useRef(false);
+  const { ready: backendReady, hasChecked: backendHasChecked } = useSharedBackendReadiness();
 
   const load = useCallback(
     async () => {
@@ -90,7 +92,10 @@ export default function DashboardPage() {
     [toast],
   );
 
-  const { reload } = usePollingLoader(load, { minIntervalMs: 2_500 });
+  const { reload } = usePollingLoader(load, {
+    minIntervalMs: 2_500,
+    enabled: backendReady,
+  });
 
   const stats = useMemo(() => countMonitorStatuses(statuses), [statuses]);
 
@@ -184,9 +189,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {loading ? (
+        {loading || !backendReady ? (
           <div className="flex justify-center rounded-2xl border border-default-200 bg-content1 py-24">
-            <Spinner size="lg" />
+            <div className="flex flex-col items-center gap-3">
+              <Spinner size="lg" />
+              <p className="text-xs text-default-500">
+                {!backendHasChecked
+                  ? "Checking backend readiness..."
+                  : "Waiting for backend startup (Docker compile in progress)."}
+              </p>
+            </div>
           </div>
         ) : (
           <>

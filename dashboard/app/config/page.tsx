@@ -6,6 +6,7 @@ import { Icon } from "@iconify/react";
 import { useApiUrl } from "@/lib/useApiUrl";
 import { useToast } from "@/components/ToastProvider";
 import { getRawConfig, restartServer, saveRawConfig } from "@/lib/api";
+import { useSharedBackendReadiness } from "@/components/BackendReadinessProvider";
 
 function isCrossOriginApiUrl(url: string): boolean {
   const cleaned = url.trim();
@@ -24,6 +25,7 @@ function isCrossOriginApiUrl(url: string): boolean {
 export default function ConfigPage() {
   const { toast } = useToast();
   const { url: apiUrl, setUrl: setApiUrl, mounted } = useApiUrl();
+  const { ready: backendReady, hasChecked: backendHasChecked } = useSharedBackendReadiness();
   const [yaml, setYaml] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -41,8 +43,12 @@ export default function ConfigPage() {
   }, [toast]);
 
   useEffect(() => {
-    loadConfig();
-  }, [loadConfig]);
+    if (!backendReady) {
+      setLoading(true);
+      return;
+    }
+    void loadConfig();
+  }, [backendReady, loadConfig]);
 
   useEffect(() => {
     if (mounted) setTempApiUrl(apiUrl);
@@ -175,9 +181,16 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {loading ? (
+      {loading || !backendReady ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+          <div className="flex flex-col items-center gap-3">
+            <Spinner size="lg" />
+            <p className="text-xs text-muted">
+              {!backendHasChecked
+                ? "Checking backend readiness..."
+                : "Waiting for backend startup (Docker compile in progress)."}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="bg-content1 border border-divider rounded-xl overflow-hidden">
