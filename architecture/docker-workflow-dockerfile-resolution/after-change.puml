@@ -1,0 +1,24 @@
+@startuml
+skinparam backgroundColor White
+skinparam defaultFontColor Black
+skinparam ArrowColor Black
+skinparam ComponentStyle rectangle
+skinparam shadowing false
+
+title Dashboard Image Build Path Resolution (After)
+
+actor "GitHub Runner" as Runner #D6EAF8
+rectangle "docker/build-push-action" as Action #FDEBD0
+rectangle "Buildx CLI Invocation" as Buildx #D5F5E3
+folder "Repository Root" as Root #FFFFFF
+folder "dashboard/" as Dashboard #E8F8F5
+file "dashboard/Dockerfile" as DashDockerfile #E8F8F5
+
+Runner -> Action : matrix.context=./dashboard\nmatrix.dockerfile=Dockerfile
+Action -> Buildx : docker buildx build\n--file $GITHUB_WORKSPACE/./dashboard/Dockerfile ./dashboard
+Buildx -> DashDockerfile : Resolve explicit absolute file path
+Buildx -> Runner : Dockerfile loaded\nbuild continues
+
+DashDockerfile -[dashed]-> Dashboard
+Dashboard -[dashed]-> Root
+@enduml
