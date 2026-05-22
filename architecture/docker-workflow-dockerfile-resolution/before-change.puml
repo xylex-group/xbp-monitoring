@@ -1,0 +1,24 @@
+@startuml
+skinparam backgroundColor White
+skinparam defaultFontColor Black
+skinparam ArrowColor Black
+skinparam ComponentStyle rectangle
+skinparam shadowing false
+
+title Dashboard Image Build Path Resolution (Before)
+
+actor "GitHub Runner" as Runner #D6EAF8
+rectangle "docker/build-push-action" as Action #FDEBD0
+rectangle "Buildx CLI Invocation" as Buildx #F5B7B1
+folder "Repository Root" as Root #FFFFFF
+folder "dashboard/" as Dashboard #E8F8F5
+file "dashboard/Dockerfile" as DashDockerfile #E8F8F5
+
+Runner -> Action : matrix.context=./dashboard\nmatrix.dockerfile=Dockerfile
+Action -> Buildx : docker buildx build\n--file Dockerfile ./dashboard
+Buildx -> Root : Resolve Dockerfile relative to runner cwd
+Buildx -> Runner : ERROR\nopen Dockerfile: no such file or directory
+
+DashDockerfile -[dashed]-> Dashboard : Exists but not selected
+Dashboard -[dashed]-> Root
+@enduml

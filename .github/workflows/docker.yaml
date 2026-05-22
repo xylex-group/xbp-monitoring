@@ -29,7 +29,7 @@ jobs:
             image_suffix: backend
           - name: dashboard
             context: ./dashboard
-            dockerfile: dashboard/Dockerfile
+            dockerfile: Dockerfile
             image_suffix: dashboard
     # Sets the permissions granted to the `GITHUB_TOKEN` for the actions in this job.
     permissions:
@@ -73,7 +73,7 @@ jobs:
         uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
         with:
           context: ${{ matrix.context }}
-          file: ${{ matrix.dockerfile }}
+          file: ${{ github.workspace }}/${{ matrix.context }}/${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
