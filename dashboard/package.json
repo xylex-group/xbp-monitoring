@@ -2,6 +2,7 @@
   "name": "xbp-monitoring-dashboard",
   "private": true,
   "version": "0.1.0",
+  "packageManager": "pnpm@11.5.2",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
